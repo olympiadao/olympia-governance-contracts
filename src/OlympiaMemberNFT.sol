@@ -67,10 +67,7 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     }
 
     /// @dev Required override for diamond inheritance (ERC721 + ERC721Enumerable + ERC721Votes)
-    function _increaseBalance(address account, uint128 value)
-        internal
-        override(ERC721, ERC721Enumerable, ERC721Votes)
-    {
+    function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable, ERC721Votes) {
         super._increaseBalance(account, value);
     }
 
