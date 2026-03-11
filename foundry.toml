@@ -1,0 +1,15 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+
+[rpc_endpoints]
+mordor = "${MORDOR_RPC_URL}"
+etc = "${ETC_RPC_URL}"
+
+[etherscan]
+mordor = { key = "", url = "https://etc-mordor.blockscout.com/api" }
+etc = { key = "", url = "https://etc.blockscout.com/api" }
