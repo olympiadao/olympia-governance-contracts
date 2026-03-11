@@ -1,7 +1,7 @@
 # Olympia Implementation — Next Steps
 
 **Last Updated:** 2026-03-11
-**Current Status:** Phase 2B complete. 87 tests passing. All Stage 2 contracts built but not yet deployed to Mordor.
+**Current Status:** Phase 2C in progress. All contracts deployed to Mordor. App built. E2E lifecycle test pending.
 
 ---
 
@@ -10,7 +10,7 @@
 | Stage | ECIPs | Status | What's Done |
 |-------|-------|--------|-------------|
 | **1 — Hard Fork** | 1111, 1112, 1121 | ✅ Complete | 3 clients implemented, Treasury deployed Mordor + ETC |
-| **2 — CoreDAO** | 1113, 1114, 1119 | ✅ Code complete | All contracts built and tested (87 tests). Not yet deployed. |
+| **2 — CoreDAO** | 1113, 1114, 1119 | ✅ Deployed to Mordor | All 7 contracts deployed. App built. E2E test pending. |
 | **3 — Futarchy** | 1117, 1118 | 🔬 Research | Prototype in olympia-futarchy repo (1,345 tests). Not integrated. |
 | **4 — Miner Experimentation** | 1115 | ⏳ Deferred | Spec written. Requires fee-market data post-Olympia activation. |
 | **5 — Protocol Hardcode** | 1116, 1122 | 🚫 Deferred | Requires Phase 4 empirical data. Second hard fork. |
@@ -21,64 +21,54 @@
 
 **Priority:** HIGH — needed before Mordor activation (block 15,800,850, ~March 28, 2026)
 
-### 2C-1: Deploy Phase 2A Contracts to Mordor
+### 2C-1: Deploy Phase 2A Contracts to Mordor — ✅ COMPLETE
 
-Deploy SanctionsOracle and OlympiaMemberNFT with CREATE2.
+Deployed SanctionsOracle and OlympiaMemberNFT via `DeployFoundation.s.sol` with CREATE2.
 
-```bash
-# Requires: PRIVATE_KEY in .env, Mordor RPC
-# Need a Phase 2A deploy script (currently only Phase 2B script exists)
-```
+- SanctionsOracle: `0xEeeb33c8b7C936bD8e72A859a3e1F9cc8A26f3B4`
+- OlympiaMemberNFT: `0x720676EBfe45DECfC43c8E9870C64413a2480EE0`
+- First NFT minted to dev wallet (`0x3b0952fB8eAAC74E56E176102eBA70BAB1C81537`)
 
-**Tasks:**
-1. Write `script/DeployFoundation.s.sol` for Phase 2A contracts (Oracle + NFT)
-2. Deploy to Mordor via `forge script --broadcast --legacy`
-3. Record deployed addresses
-4. Mint NFT to dev wallet (`0x3b0952fB8eAAC74E56E176102eBA70BAB1C81537`)
+### 2C-2: Deploy Phase 2B Contracts to Mordor — ✅ COMPLETE
 
-### 2C-2: Deploy Phase 2B Contracts to Mordor
+Deployed Governor pipeline via `DeployGovernance.s.sol` with CREATE2.
 
-Deploy Governor pipeline using existing `DeployGovernance.s.sol`.
+- OlympiaGovernor: `0xEdbD61F1cE825CF939beBB422F8C914a69826dDA`
+- OlympiaExecutor: `0x94d4f74dDdE715Ed195B597A3434713690B14e97`
+- TimelockController: `0x1E0fADee5540a77012f1944fcce58677fC087f6e`
+- ECFPRegistry: `0xcB532fe70299D53Cc81B5F6365f56A108784d05d`
 
-```bash
-export SANCTIONS_ORACLE=<from 2C-1>
-export MEMBER_NFT=<from 2C-1>
-forge script script/DeployGovernance.s.sol:DeployGovernance \
-  --rpc-url $MORDOR_RPC_URL --private-key $PRIVATE_KEY --broadcast --legacy
-```
+Post-deploy roles granted: WITHDRAWER_ROLE on Treasury to Executor, GOVERNOR_ROLE on ECFPRegistry to Timelock.
 
-**Post-deploy setup:**
-1. Grant `WITHDRAWER_ROLE` on Treasury to Executor
-2. Grant `GOVERNOR_ROLE` on ECFPRegistry to Timelock
-3. Mint NFTs to test voters (alice, bob, charlie)
+### 2C-3: Live Governance Lifecycle Test on Mordor — 🔄 IN PROGRESS
 
-### 2C-3: Live Governance Lifecycle Test on Mordor
+E2E test on live testnet (~82 minutes total):
 
-End-to-end test on live testnet (not just Foundry):
+1. ✅ Verify contract state via cast calls
+2. Mint second NFT to `0x66a3dc0957c585A4952507C2470b8916d18d0645`
+3. Create treasury proposal (0.1 METC to second member)
+4. Wait 1 block → Active
+5. Cast "For" vote
+6. Wait 100 blocks (~22 min) → Succeeded
+7. Queue proposal → Queued
+8. Wait 3600s (1 hour) → executable
+9. Execute proposal → Executed
+10. Verify treasury balance decreased, recipient received funds
+11. Test cancelIfSanctioned with sanctioned address
 
-1. Submit ECFP via ECFPRegistry
-2. Create Governor proposal referencing the ECFP
-3. Cast votes from NFT holders
-4. Queue proposal after voting period
-5. Execute after timelock delay
-6. Verify Treasury → Executor → recipient fund flow
-7. Test cancelIfSanctioned with a sanctioned address
+### 2C-4: Olympia App Integration — ✅ COMPLETE
 
-### 2C-4: Olympia App Integration
+Governance UI built and pushed (`olympia-app` commit `9ef39b8`).
 
-Connect the governance UI (`olympia-app`) to deployed contracts.
-
-**Repo:** `/media/dev/2tb/dev/olympiadao/olympia-app/`
-**Status:** Placeholder (Next.js 16 + wagmi scaffold)
-
-**Tasks:**
-1. Generate TypeScript ABIs from deployed contracts (`forge build --extra-output-files abi`)
-2. Configure wagmi with Mordor chain + contract addresses
-3. Build proposal creation flow (ECFP submit → Governor propose)
-4. Build voting interface (castVote)
-5. Build queue/execute interface
-6. Build proposal status tracker (Governor state + ECFPRegistry status)
-7. Build sanctions check display
+**Features:**
+- Dashboard with stats, governance guide, recent proposals
+- Proposal list with lifecycle guide
+- Proposal detail with voting, Queue, Execute buttons, state guidance
+- New proposal form with treasury action + instructional content
+- Members page enumerating NFT holders via Transfer events
+- Treasury page with balance, contract addresses, withdrawal explanation
+- Admin page: mint NFTs, manage sanctions, view roles
+- Demo Config page: governance params, contract addresses, E2E testing checklist
 
 ---
 
@@ -210,6 +200,8 @@ forge script script/DeployGovernance.s.sol:DeployGovernance \
 | 2026-03-11 | GovernorPreventLateQuorum included | Prevents last-minute vote manipulation, minimal overhead |
 | 2026-03-11 | GovernorStorage included | Enables proposalDetails() for cancelIfSanctioned Layer 2 |
 | 2026-03-11 | Executor is standalone (no OZ inheritance) | Minimal attack surface, only 3 immutables + 1 function |
+| 2026-03-11 | Two-track branch strategy (pre-olympia/main) | OZ 5.2+ uses mcopy (EIP-5656) unavailable on Shanghai EVM. pre-olympia pins OZ 5.1.0 + evm_version=shanghai + via_ir=true |
+| 2026-03-11 | Mordor deployment on pre-olympia branch | ETC Mordor is Shanghai (Spiral). Post-Olympia will switch to main branch with OZ 5.6 + Cancun |
 
 ---
 
@@ -221,8 +213,8 @@ forge script script/DeployGovernance.s.sol:DeployGovernance \
 |------|---------|--------|
 | [olympia-framework](https://github.com/olympiadao/olympia-framework) | 11 ECIP specs | Complete |
 | [olympia-treasury-contract](https://github.com/olympiadao/olympia-treasury-contract) | Treasury vault | Deployed |
-| [olympia-governance-contracts](https://github.com/olympiadao/olympia-governance-contracts) | Governor pipeline | Phase 2B code complete |
-| [olympia-app](https://github.com/olympiadao/olympia-app) | Governance dApp | Placeholder |
+| [olympia-governance-contracts](https://github.com/olympiadao/olympia-governance-contracts) | Governor pipeline | Deployed to Mordor |
+| [olympia-app](https://github.com/olympiadao/olympia-app) | Governance dApp | Feature complete |
 | [olympia-brand](https://github.com/olympiadao/olympia-brand) | Logo, design tokens | Complete |
 | [olympiadao-org](https://github.com/olympiadao/olympiadao-org) | Landing page | Complete |
 | [olympiatreasury-org](https://github.com/olympiadao/olympiatreasury-org) | Treasury page | Complete |
@@ -232,12 +224,12 @@ forge script script/DeployGovernance.s.sol:DeployGovernance \
 | Contract | Mordor | ETC Mainnet |
 |----------|--------|-------------|
 | OlympiaTreasury | `0xd6165F3aF4281037bce810621F62B43077Fb0e37` | `0xd6165F3aF4281037bce810621F62B43077Fb0e37` |
-| SanctionsOracle | TBD (Phase 2C) | TBD (Phase 2E) |
-| OlympiaMemberNFT | TBD (Phase 2C) | TBD (Phase 2E) |
-| OlympiaGovernor | TBD (Phase 2C) | TBD (Phase 2E) |
-| OlympiaExecutor | TBD (Phase 2C) | TBD (Phase 2E) |
-| TimelockController | TBD (Phase 2C) | TBD (Phase 2E) |
-| ECFPRegistry | TBD (Phase 2C) | TBD (Phase 2E) |
+| SanctionsOracle | `0xEeeb33c8b7C936bD8e72A859a3e1F9cc8A26f3B4` | TBD (Phase 2E) |
+| OlympiaMemberNFT | `0x720676EBfe45DECfC43c8E9870C64413a2480EE0` | TBD (Phase 2E) |
+| OlympiaGovernor | `0xEdbD61F1cE825CF939beBB422F8C914a69826dDA` | TBD (Phase 2E) |
+| OlympiaExecutor | `0x94d4f74dDdE715Ed195B597A3434713690B14e97` | TBD (Phase 2E) |
+| TimelockController | `0x1E0fADee5540a77012f1944fcce58677fC087f6e` | TBD (Phase 2E) |
+| ECFPRegistry | `0xcB532fe70299D53Cc81B5F6365f56A108784d05d` | TBD (Phase 2E) |
 | Dev Wallet | `0x3b0952fB8eAAC74E56E176102eBA70BAB1C81537` | Same |
 
 ### Mordor Activation

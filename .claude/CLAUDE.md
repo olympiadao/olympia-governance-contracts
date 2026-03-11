@@ -63,10 +63,35 @@ ECFPRegistry.submit() → OlympiaGovernor.propose() [Layer 1]
   → OlympiaTreasury.withdraw()
 ```
 
-## Related Deployments
+## Deployed Addresses (Mordor, Chain 63)
 
-- Treasury: `0xd6165F3aF4281037bce810621F62B43077Fb0e37` (Mordor + ETC mainnet)
-- Governance contracts: TBD (Demo v0.1, OLYMPIA_DEMO_V0_1 salt)
+All deployed with CREATE2 salt `OLYMPIA_DEMO_V0_1` for deterministic addresses.
+
+| Contract | Address |
+|----------|---------|
+| OlympiaGovernor | `0xEdbD61F1cE825CF939beBB422F8C914a69826dDA` |
+| OlympiaExecutor | `0x94d4f74dDdE715Ed195B597A3434713690B14e97` |
+| TimelockController | `0x1E0fADee5540a77012f1944fcce58677fC087f6e` |
+| ECFPRegistry | `0xcB532fe70299D53Cc81B5F6365f56A108784d05d` |
+| SanctionsOracle | `0xEeeb33c8b7C936bD8e72A859a3e1F9cc8A26f3B4` |
+| OlympiaMemberNFT | `0x720676EBfe45DECfC43c8E9870C64413a2480EE0` |
+| OlympiaTreasury | `0xd6165F3aF4281037bce810621F62B43077Fb0e37` |
+
+## Branch Strategy
+
+- **`pre-olympia`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true` — deployed to Mordor (pre-Olympia EVM)
+- **`main`**: OZ 5.6.0, Cancun defaults — for post-Olympia deployments
+
+## Voting Parameters (Mordor)
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Voting Delay | 1 block (~13s) | Time before voting starts |
+| Voting Period | 100 blocks (~22 min) | Voting window duration |
+| Quorum | 10% of NFT supply | Minimum 'For' votes needed |
+| Late Quorum Extension | 50 blocks (~11 min) | Extension if quorum reached late |
+| Timelock Delay | 3600s (1 hour) | Waiting period before execution |
+| Proposal Threshold | 0 | Any NFT holder can propose |
 
 ## Boundaries
 
