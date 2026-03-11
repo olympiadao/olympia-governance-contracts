@@ -1,34 +1,55 @@
 # Olympia Governance Contracts
 
-Foundation contracts for the Olympia Demo v0.1 governance pipeline on Ethereum Classic (ECIP-1113, ECIP-1119).
+Governance pipeline contracts for the Olympia Demo v0.1 on Ethereum Classic (ECIP-1113, ECIP-1114, ECIP-1119).
 
 ## Contracts
 
 | Contract | ECIP | Purpose |
 |----------|------|---------|
+| `OlympiaGovernor` | 1113 | Governor with 3-layer sanctions defense, OIP self-upgrade |
+| `OlympiaExecutor` | 1113 | Layer 3 sanctions gate between Timelock and Treasury |
+| `ECFPRegistry` | 1114 | Hash-bound funding proposals with GOVERNOR_ROLE status transitions |
 | `SanctionsOracle` | 1119 | On-chain sanctions list with MANAGER_ROLE access control |
 | `OlympiaMemberNFT` | 1113 | Soulbound governance NFT — one NFT = one vote |
-| `ISanctionsOracle` | 1119 | Interface for sanctions queries |
-| `IERC5192` | — | EIP-5192 soulbound token interface (not in OZ v5.6) |
-| `IOlympiaVotingModule` | 1113 | Forward-looking modular voting interface |
+
+### Interfaces
+
+| Interface | Purpose |
+|-----------|---------|
+| `ISanctionsOracle` | Sanctions query interface |
+| `ITreasury` | Minimal Treasury withdrawal interface |
+| `IERC5192` | EIP-5192 soulbound token interface |
+| `IOlympiaVotingModule` | Forward-looking modular voting interface |
 
 ## Architecture
 
 ```
-OlympiaMemberNFT (soulbound ERC721 + ERC721Votes)
-  │
-  ├── MINTER_ROLE gates issuance (KYC/identity verification)
-  ├── Auto-delegates on mint (votes active immediately)
-  ├── Non-transferable (_update blocks transfers)
-  └── ERC5192 locked() always returns true
-
-SanctionsOracle (AccessControl)
-  │
-  ├── MANAGER_ROLE can add/remove sanctioned addresses
-  └── Used by OlympiaGovernor for 3-layer sanctions defense
+ECFPRegistry.submit() → hash-bound proposal record (application layer)
+        ↓
+OlympiaGovernor.propose() → Layer 1: sanctions check on recipient
+        ↓
+Voting (snapshot block) → GovernorVotes reads OlympiaMemberNFT.getPastVotes()
+        ↓
+[Optional] cancelIfSanctioned() → Layer 2: permissionless cancel
+        ↓
+OlympiaGovernor.queue() → TimelockController.scheduleBatch()
+        ↓
+Wait minDelay (1 hour Mordor / 1 day production)
+        ↓
+OlympiaGovernor.execute() → TimelockController.executeBatch()
+        ↓
+OlympiaExecutor.executeTreasury() → Layer 3: final sanctions gate
+        ↓
+OlympiaTreasury.withdraw(recipient, amount)
 ```
 
-Demo v0.1 uses standard OZ `GovernorVotes` reading directly from the soulbound `OlympiaMemberNFT`. The `IOlympiaVotingModule` interface is a spec artifact for future governance-gated module swaps.
+### 3-Layer Sanctions Defense (ECIP-1119)
+
+| Layer | Location | Trigger |
+|-------|----------|---------|
+| 1 | `OlympiaGovernor.propose()` | Reverts if target or calldata recipient is sanctioned |
+| 2 | `OlympiaGovernor.cancelIfSanctioned()` | Permissionless cancel if recipient becomes sanctioned mid-vote |
+| 3 | `OlympiaExecutor.executeTreasury()` | Final gate before treasury withdrawal |
 
 ## Tech Stack
 
@@ -43,20 +64,43 @@ Demo v0.1 uses standard OZ `GovernorVotes` reading directly from the soulbound `
 
 ```bash
 forge build          # Compile
-forge test -vv       # Run tests (33 tests)
+forge test -vv       # Run tests (87 tests)
 forge fmt            # Format Solidity
+```
+
+## Deploy
+
+```bash
+source .env
+# Set Phase 2A contract addresses
+export SANCTIONS_ORACLE=<address>
+export MEMBER_NFT=<address>
+
+# Mordor
+forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RPC_URL --private-key $PRIVATE_KEY --broadcast --legacy
+
+# ETC mainnet
+forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $ETC_RPC_URL --private-key $PRIVATE_KEY --broadcast --legacy
 ```
 
 ## Tests
 
-- **SanctionsOracle:** 14 tests — add/remove, isSanctioned, access control, edge cases
-- **OlympiaMemberNFT:** 19 tests — mint, auto-delegate, soulbound enforcement, ERC5192, getPastVotes, enumeration, supportsInterface
+| Test Suite | Count | Coverage |
+|------------|-------|----------|
+| SanctionsOracle | 14 | Add/remove, isSanctioned, access control, edge cases |
+| OlympiaMemberNFT | 19 | Mint, auto-delegate, soulbound, ERC5192, getPastVotes |
+| OlympiaExecutor | 9 | Constructor, executeTreasury, access control, sanctions |
+| OlympiaGovernor | 21 | Propose, vote, queue, execute, cancelIfSanctioned, quorum |
+| ECFPRegistry | 19 | Submit, status transitions, access control, chainId isolation |
+| GovernancePipeline | 5 | End-to-end: all 3 sanctions layers, self-upgrade |
+
+**Total: 87 tests**
 
 ## Related
 
 - [OlympiaTreasury](https://github.com/olympiadao/olympia-treasury-contract) — Treasury vault (ECIP-1112), deployed at `0xd6165F3aF4281037bce810621F62B43077Fb0e37`
 - [Olympia Framework](https://github.com/olympiadao/olympia-framework) — Full specification library (11 ECIPs)
-- [Development Roadmap](https://github.com/olympiadao/ROADMAP.md) — Phase 2A-2E build plan
+- [Olympia App](https://github.com/olympiadao/olympia-app) — Governance dApp (Next.js 16 + wagmi)
 
 ## License
 

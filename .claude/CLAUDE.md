@@ -2,7 +2,7 @@
 
 ## Project Context
 
-Solidity governance contracts for the Olympia Demo v0.1 on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.6 with custom voting module interface.
+Solidity governance contracts for the Olympia Demo v0.1 on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.6 with soulbound NFT voting.
 
 **Repo:** `olympiadao/olympia-governance-contracts`
 
@@ -17,7 +17,7 @@ Solidity governance contracts for the Olympia Demo v0.1 on Ethereum Classic. Imp
 
 ```bash
 forge build          # Compile
-forge test -vv       # Run tests
+forge test -vv       # Run tests (87 tests)
 forge fmt            # Format Solidity
 forge snapshot       # Gas snapshots
 ```
@@ -26,22 +26,42 @@ forge snapshot       # Gas snapshots
 
 ```bash
 source .env
+export SANCTIONS_ORACLE=<address>
+export MEMBER_NFT=<address>
 # Mordor
-forge script script/Deploy.s.sol:DeployScript --rpc-url $MORDOR_RPC_URL --private-key $PRIVATE_KEY --broadcast --legacy
+forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RPC_URL --private-key $PRIVATE_KEY --broadcast --legacy
 # ETC mainnet
-forge script script/Deploy.s.sol:DeployScript --rpc-url $ETC_RPC_URL --private-key $PRIVATE_KEY --broadcast --legacy
+forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $ETC_RPC_URL --private-key $PRIVATE_KEY --broadcast --legacy
 ```
 
 ## Key Contracts
 
 | Contract | ECIP | Purpose |
 |----------|------|---------|
-| SanctionsOracle | 1119 | 3-layer sanctions defense |
-| IOlympiaVotingModule | 1113 | Custom voting module interface |
-| NFTVotingModuleAdapter | 1113 | Wraps OlympiaMemberNFT |
-| OlympiaExecutor | 1113 | Sanctions gate + WITHDRAWER_ROLE |
-| OlympiaGovernor | 1113 | Custom `_getVotes`, OIP self-upgrade |
-| ECFPRegistry | 1114 | Hash-bound funding proposals |
+| OlympiaGovernor | 1113 | Governor with 3-layer sanctions defense, OIP self-upgrade |
+| OlympiaExecutor | 1113 | Layer 3 sanctions gate between Timelock and Treasury |
+| ECFPRegistry | 1114 | Hash-bound funding proposals with GOVERNOR_ROLE |
+| SanctionsOracle | 1119 | On-chain sanctions list with MANAGER_ROLE |
+| OlympiaMemberNFT | 1113 | Soulbound governance NFT (1 NFT = 1 vote) |
+
+## Interfaces
+
+| Interface | Purpose |
+|-----------|---------|
+| ISanctionsOracle | Sanctions query interface |
+| ITreasury | Minimal Treasury withdrawal interface |
+| IERC5192 | EIP-5192 soulbound token interface |
+| IOlympiaVotingModule | Forward-looking modular voting interface |
+
+## Execution Path
+
+```
+ECFPRegistry.submit() → OlympiaGovernor.propose() [Layer 1]
+  → vote → [cancelIfSanctioned() Layer 2]
+  → queue() → TimelockController
+  → execute() → OlympiaExecutor.executeTreasury() [Layer 3]
+  → OlympiaTreasury.withdraw()
+```
 
 ## Related Deployments
 
@@ -53,7 +73,6 @@ forge script script/Deploy.s.sol:DeployScript --rpc-url $ETC_RPC_URL --private-k
 ### Always Do
 - Run `forge test` before committing
 - Use CREATE2 for deterministic addresses
-- Use AccessControlDefaultAdminRules for role management
 - Emit events for all state changes
 
 ### Ask First
