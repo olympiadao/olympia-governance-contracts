@@ -1,0 +1,46 @@
+# Compiler files
+cache/
+out/
+
+# Broadcast dry-runs and local devnet logs
+/broadcast/**/dry-run/
+/broadcast/*/31337/
+
+# Docs
+docs/
+
+# Secrets & credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account.json
+secrets/
+keystore/
+*.keystore
+wallet.json
+mnemonic.txt
+
+# Claude internal
+.claude/SESSION_NOTES.md
+.claude/reports/
+.claude/debug.log
+SESSION_NOTES.md
+PLANNING.md
+SCRATCH.md
+*.scratch.*
+*.draft.*
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
