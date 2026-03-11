@@ -109,13 +109,15 @@ contract OlympiaMemberNFTTest is Test {
     // --- getPastVotes (snapshot) ---
 
     function test_getPastVotes_snapshotCorrectness() public {
+        // Set explicit block to avoid via_ir block advancement ambiguity
+        vm.roll(100);
         vm.prank(admin);
         nft.safeMint(alice);
 
-        uint256 mintBlock = block.number;
-        vm.roll(mintBlock + 1);
+        // Advance well past mint block — getPastVotes requires strictly past blocks
+        vm.roll(200);
 
-        assertEq(nft.getPastVotes(alice, mintBlock), 1);
+        assertEq(nft.getPastVotes(alice, 100), 1);
     }
 
     // --- Enumeration ---
