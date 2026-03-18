@@ -27,7 +27,7 @@ contract DeployGovernance is Script {
 
     // Treasury (demo v0.2, pure Solidity immutable executor)
     // Set after deploying Treasury with PrecomputeAddresses.s.sol
-    address constant TREASURY = address(0); // TODO: set after Treasury deployment
+    address constant TREASURY = 0x2CA0e3930383A9325Bb7f793fa6DB163AC9759d1;
 
     function run() public {
         address deployer = msg.sender;
