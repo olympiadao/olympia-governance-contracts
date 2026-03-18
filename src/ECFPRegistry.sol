@@ -15,7 +15,8 @@ contract ECFPRegistry is AccessControl {
         Approved,
         Rejected,
         Executed,
-        Expired
+        Expired,
+        Withdrawn
     }
 
     struct Proposal {
@@ -28,6 +29,8 @@ contract ECFPRegistry is AccessControl {
         ProposalStatus status;
     }
 
+    uint256 public immutable minReviewPeriod;
+
     mapping(bytes32 => Proposal) internal _proposals;
 
     event ProposalSubmitted(
@@ -35,24 +38,40 @@ contract ECFPRegistry is AccessControl {
     );
     event ProposalActivated(bytes32 indexed hashId);
     event ProposalQueued(bytes32 indexed hashId);
-    event ProposalExecuted(bytes32 indexed hashId, address recipient, uint256 amount, uint256 timestamp);
+    event ProposalExecuted(
+        uint256 indexed ecfpId, bytes32 indexed hashId, address recipient, uint256 amount, uint256 timestamp
+    );
     event ProposalRejected(bytes32 indexed hashId);
     event ProposalExpired(bytes32 indexed hashId);
+    event DraftUpdated(uint256 indexed ecfpId, bytes32 indexed oldHashId, bytes32 indexed newHashId);
+    event DraftWithdrawn(uint256 indexed ecfpId, bytes32 indexed hashId);
 
     error DuplicateProposal(bytes32 hashId);
     error ProposalNotFound(bytes32 hashId);
     error InvalidStatusTransition(ProposalStatus current, ProposalStatus target);
+    error ZeroRecipient();
+    error ZeroAmount();
+    error EmptyMetadata();
+    error EmptyEcfpId();
+    error NotSubmitter();
+    error ReviewPeriodActive();
 
-    constructor(address admin) {
+    constructor(address admin, uint256 _minReviewPeriod) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GOVERNOR_ROLE, admin);
+        minReviewPeriod = _minReviewPeriod;
     }
 
-    /// @notice Submit a new funding proposal (permissionless)
+    /// @notice Submit a new funding proposal (permissionless — any ETC address)
     function submit(bytes32 ecfpId, address recipient, uint256 amount, bytes32 metadataCID)
         external
         returns (bytes32 hashId)
     {
+        if (ecfpId == bytes32(0)) revert EmptyEcfpId();
+        if (recipient == address(0)) revert ZeroRecipient();
+        if (amount == 0) revert ZeroAmount();
+        if (metadataCID == bytes32(0)) revert EmptyMetadata();
+
         hashId = keccak256(abi.encodePacked(ecfpId, recipient, amount, metadataCID, block.chainid));
         if (_proposals[hashId].timestamp != 0) revert DuplicateProposal(hashId);
 
@@ -69,12 +88,66 @@ contract ECFPRegistry is AccessControl {
         emit ProposalSubmitted(hashId, ecfpId, recipient, amount, metadataCID);
     }
 
-    /// @notice Activate a Draft proposal (Draft → Active)
+    /// @notice Update a Draft proposal's fields (only original submitter, only Draft status)
+    function updateDraft(bytes32 hashId, address recipient, uint256 amount, bytes32 metadataCID)
+        external
+        returns (bytes32 newHashId)
+    {
+        _requireExists(hashId);
+        Proposal storage p = _proposals[hashId];
+        if (p.status != ProposalStatus.Draft) {
+            revert InvalidStatusTransition(p.status, ProposalStatus.Draft);
+        }
+        if (msg.sender != p.proposer) revert NotSubmitter();
+        if (recipient == address(0)) revert ZeroRecipient();
+        if (amount == 0) revert ZeroAmount();
+        if (metadataCID == bytes32(0)) revert EmptyMetadata();
+
+        bytes32 ecfpId = p.ecfpId;
+        newHashId = keccak256(abi.encodePacked(ecfpId, recipient, amount, metadataCID, block.chainid));
+        if (newHashId != hashId && _proposals[newHashId].timestamp != 0) revert DuplicateProposal(newHashId);
+
+        // Mark old entry as withdrawn if hash changed
+        if (newHashId != hashId) {
+            p.status = ProposalStatus.Withdrawn;
+            _proposals[newHashId] = Proposal({
+                ecfpId: ecfpId,
+                recipient: recipient,
+                amount: amount,
+                metadataCID: metadataCID,
+                proposer: msg.sender,
+                timestamp: block.timestamp,
+                status: ProposalStatus.Draft
+            });
+        } else {
+            p.recipient = recipient;
+            p.amount = amount;
+            p.metadataCID = metadataCID;
+            p.timestamp = block.timestamp;
+        }
+
+        emit DraftUpdated(uint256(ecfpId), hashId, newHashId);
+    }
+
+    /// @notice Withdraw a Draft proposal (only original submitter, only Draft status)
+    function withdrawDraft(bytes32 hashId) external {
+        _requireExists(hashId);
+        Proposal storage p = _proposals[hashId];
+        if (p.status != ProposalStatus.Draft) {
+            revert InvalidStatusTransition(p.status, ProposalStatus.Withdrawn);
+        }
+        if (msg.sender != p.proposer) revert NotSubmitter();
+        p.status = ProposalStatus.Withdrawn;
+        emit DraftWithdrawn(uint256(p.ecfpId), hashId);
+    }
+
+    /// @notice Activate a Draft proposal (Draft → Active). Enforces minimum review period.
     function activateProposal(bytes32 hashId) external onlyRole(GOVERNOR_ROLE) {
         _requireExists(hashId);
         if (_proposals[hashId].status != ProposalStatus.Draft) {
             revert InvalidStatusTransition(_proposals[hashId].status, ProposalStatus.Active);
         }
+        if (block.timestamp < _proposals[hashId].timestamp + minReviewPeriod) revert ReviewPeriodActive();
         _proposals[hashId].status = ProposalStatus.Active;
         emit ProposalActivated(hashId);
     }
@@ -107,7 +180,7 @@ contract ECFPRegistry is AccessControl {
         }
         _proposals[hashId].status = ProposalStatus.Executed;
         Proposal storage p = _proposals[hashId];
-        emit ProposalExecuted(hashId, p.recipient, p.amount, block.timestamp);
+        emit ProposalExecuted(uint256(p.ecfpId), hashId, p.recipient, p.amount, block.timestamp);
     }
 
     /// @notice Expire a Draft or Active proposal (Draft/Active → Expired)

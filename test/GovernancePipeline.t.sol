@@ -77,7 +77,7 @@ contract GovernancePipelineTest is Test {
         executor = new OlympiaExecutor(address(treasury), address(timelock), address(oracle));
 
         // Deploy ECFPRegistry with admin
-        registry = new ECFPRegistry(admin);
+        registry = new ECFPRegistry(admin, 0);
 
         // Configure roles
         vm.startPrank(admin);

@@ -23,6 +23,7 @@ contract DeployGovernance is Script {
     uint32 constant VOTING_PERIOD = 100; // ~22 minutes on ETC
     uint256 constant QUORUM_PERCENT = 10;
     uint48 constant LATE_QUORUM_EXTENSION = 50; // ~11 minutes
+    uint256 constant MIN_REVIEW_PERIOD = 86400; // 1 day
 
     // Treasury (deployed in Phase 1, same address on Mordor + ETC mainnet)
     address constant TREASURY = 0xd6165F3aF4281037bce810621F62B43077Fb0e37;
@@ -73,7 +74,7 @@ contract DeployGovernance is Script {
         console.log("OlympiaExecutor:", address(executor));
 
         // Step 5: Deploy ECFPRegistry
-        ECFPRegistry registry = new ECFPRegistry{salt: SALT}(deployer);
+        ECFPRegistry registry = new ECFPRegistry{salt: SALT}(deployer, MIN_REVIEW_PERIOD);
         console.log("ECFPRegistry:", address(registry));
 
         vm.stopBroadcast();
