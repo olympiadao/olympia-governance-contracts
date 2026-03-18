@@ -105,7 +105,7 @@ Salt: `keccak256("OLYMPIA_DEMO_V0_2")`
 | TimelockController | [`0xA5839b3e9445f7eE7AffdBC796DC0601f9b976C2`](https://etc.blockscout.com/address/0xa5839b3e9445f7ee7affdbc796dc0601f9b976c2) |
 | OlympiaGovernor | [`0xB85dbc899472756470EF4033b9637ff8fa2FD23D`](https://etc.blockscout.com/address/0xb85dbc899472756470ef4033b9637ff8fa2fd23d) |
 | OlympiaExecutor | [`0x64624f74F77639CbA268a6c8bEDC2778B707eF9a`](https://etc.blockscout.com/address/0x64624f74f77639cba268a6c8bedc2778b707ef9a) |
-| ECFPRegistry | [`0x184D79518D3e5D30e8B991aAFCF075f02f264F21`](https://etc.blockscout.com/address/0x184d79518d3e5d30e8b991aafcf075f02f264f21) |
+| ECFPRegistry | [`0xFB4De5674a6b9a301d16876795a74f3bdacfa722`](https://etc.blockscout.com/address/0xfb4de5674a6b9a301d16876795a74f3bdacfa722) |
 
 **Deployment order:**
 1. Deploy Treasury (CREATE, nonce 0) — executor address pre-computed but has no code yet
@@ -165,7 +165,7 @@ forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RP
 | Late Quorum Extension | 50 blocks (~11 min) | Extension if quorum reached late |
 | Timelock Delay | 3600s (1 hour) | Waiting period before execution |
 | Proposal Threshold | 0 | Any NFT holder can propose via Governor |
-| Min Review Period | 86400s (1 day) | ECFP draft review before activation |
+| Min Review Period | 300s (5 min) | ECFP draft review before activation |
 
 ## Related
 

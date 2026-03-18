@@ -80,7 +80,7 @@ ECFPRegistry.submit() → OlympiaGovernor.propose() [Layer 1]
 | Late Quorum Extension | 50 blocks (~11 min) | Extension if quorum reached late |
 | Timelock Delay | 3600s (1 hour) | Waiting period before execution |
 | Proposal Threshold | 0 | Any NFT holder can propose |
-| Min Review Period | 86400s (1 day) | ECFP draft review before activation |
+| Min Review Period | 300s (5 min) | ECFP draft review before activation |
 
 ## Boundaries
 

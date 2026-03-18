@@ -23,7 +23,7 @@ contract DeployGovernance is Script {
     uint32 constant VOTING_PERIOD = 100; // ~22 minutes on ETC
     uint256 constant QUORUM_PERCENT = 10;
     uint48 constant LATE_QUORUM_EXTENSION = 50; // ~11 minutes
-    uint256 constant MIN_REVIEW_PERIOD = 86400; // 1 day
+    uint256 constant MIN_REVIEW_PERIOD = 300; // 5 minutes (demo testing)
 
     // Treasury (demo v0.2, pure Solidity immutable executor)
     // Set after deploying Treasury with PrecomputeAddresses.s.sol
