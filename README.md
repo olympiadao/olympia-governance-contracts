@@ -55,15 +55,13 @@ OlympiaTreasury.withdraw(recipient, amount)
 | 2 | `OlympiaGovernor.cancelIfSanctioned()` | Permissionless cancel if recipient becomes sanctioned mid-vote |
 | 3 | `OlympiaExecutor.executeTreasury()` | Final gate before treasury withdrawal |
 
-### ECFPRegistry ECIP-1114 Compliance
+### ECFPRegistry (ECIP-1114)
 
-Demo v0.2 adds full ECIP-1114 compliance:
-
-- **Permissionless submission** — any ETC address can submit proposals (no NFT required). NFTs only gate voting.
-- **Draft amendment & withdrawal** — `updateDraft()` and `withdrawDraft()` for submitter-only draft management
-- **Minimum review period** — `minReviewPeriod` (5 min Mordor) enforced before `activateProposal()`
-- **Input validation** — reverts on zero recipient, zero amount, empty metadataCID, empty ecfpId
-- **ecfpId in ProposalExecuted** — `uint256 indexed ecfpId` added for indexer correlation
+- Permissionless submission — any ETC address can submit proposals (no NFT required)
+- Draft amendment (`updateDraft()`) and withdrawal (`withdrawDraft()`) — submitter-only, Draft state only
+- Minimum review period — `minReviewPeriod` (300s Mordor) enforced before `activateProposal()`
+- Input validation — reverts on zero recipient, zero amount, empty metadataCID, empty ecfpId
+- `ProposalExecuted` event includes `uint256 indexed ecfpId` for indexer correlation
 
 ## Tech Stack
 
@@ -75,18 +73,11 @@ Demo v0.2 adds full ECIP-1114 compliance:
 | EVM Version | Shanghai |
 | Target chains | Mordor (63), ETC mainnet (61) |
 
-## OZ 5.1 → 5.6 Upgrade Path
+## OZ 5.1 Constraint
 
-Demo v0.2 uses **OZ 5.1** because Mordor and ETC mainnet only support **Shanghai** until the Olympia hard fork activates (block 15,800,850). OZ 5.2+ uses `mcopy` (EIP-5656, Cancun-only).
+OZ 5.1.0 is required because Mordor and ETC mainnet only support Shanghai EVM until the Olympia hard fork activates (block 15,800,850). OZ 5.2+ uses `mcopy` (EIP-5656, Cancun-only).
 
-**What OZ 5.6 brings:**
-- `mcopy` opcode (EIP-5656): faster memory operations, lower gas for ABI encoding/decoding
-- GovernorStorage extension: on-chain proposal description storage
-- Improved TimelockController: batch operation safety, better event emissions
-- Security patches: 18 months of audits and fixes between 5.1 and 5.6
-- Cancun opcodes: transient storage (EIP-1153), SELFDESTRUCT restriction (EIP-6780)
-
-**Production deployment** will use OZ 5.6 after Olympia activates Cancun. Different bytecode → different CREATE2 addresses → separate Treasury deployment.
+Production deployment will use OZ 5.6 after Olympia activates Cancun. Different bytecode produces different CREATE2 addresses, requiring a separate Treasury deployment.
 
 ## Deployments
 
