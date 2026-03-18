@@ -88,6 +88,35 @@ Demo v0.2 uses **OZ 5.1** because Mordor and ETC mainnet only support **Shanghai
 
 **Production deployment** will use OZ 5.6 after Olympia activates Cancun. Different bytecode → different CREATE2 addresses → separate Treasury deployment.
 
+## Deployments
+
+### Demo v0.2 (Pre-Olympia, OZ 5.1 Governance)
+
+All governance contracts deploy via **CREATE2** (deterministic deployer factory `0x4e59b44847b379578588920cA78FbF26c0B4956C`). Treasury deploys via **CREATE** (nonce-based) from the [treasury repo](https://github.com/olympiadao/olympia-treasury-contract).
+
+Deployer: `0x7C3311F29e318617fed0833E68D6522948AaE995` (fresh EOA, nonce 0)
+Salt: `keccak256("OLYMPIA_DEMO_V0_2")`
+
+| Contract | Address |
+|----------|---------|
+| OlympiaTreasury | `0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf` |
+| SanctionsOracle | `0xfF2B8D7937D908D81C72D20AC99302EE6ACc2709` |
+| OlympiaMemberNFT | `0x73e78d3a3470396325b975FcAFA8105A89A9E672` |
+| TimelockController | `0xA5839b3e9445f7eE7AffdBC796DC0601f9b976C2` |
+| OlympiaGovernor | `0xB85dbc899472756470EF4033b9637ff8fa2FD23D` |
+| OlympiaExecutor | `0x64624f74F77639CbA268a6c8bEDC2778B707eF9a` |
+| ECFPRegistry | `0x184D79518D3e5D30e8B991aAFCF075f02f264F21` |
+
+**Deployment order:**
+1. Deploy Treasury (CREATE, nonce 0) — executor address pre-computed but has no code yet
+2. Deploy Foundation (CREATE2) — SanctionsOracle, OlympiaMemberNFT
+3. Deploy Governance (CREATE2) — Timelock, Governor, Executor, ECFPRegistry
+4. Verify: `treasury.executor() == OlympiaExecutor address`
+
+### Demo v0.1 (OZ 5.1 Governance, Mordor)
+
+Preserved on the `demo_v0.1` branch. See [DEPLOYMENT.md](DEPLOYMENT.md) for full address matrix.
+
 ## Quick Commands
 
 ```bash
@@ -123,7 +152,7 @@ forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RP
 ## Branch Strategy
 
 - **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true`, CREATE2 salt `OLYMPIA_DEMO_V0_2`
-- **`demo_v0.1`** / **`pre-olympia`**: OZ 5.1.0, deployed to Mordor (demo v0.1 governance suite)
+- **`demo_v0.1`**: OZ 5.1.0, deployed to Mordor (demo v0.1 governance suite)
 - **`main`**: OZ 5.6.0, Cancun defaults — for post-Olympia production deployments
 
 ## Voting Parameters (Mordor)
