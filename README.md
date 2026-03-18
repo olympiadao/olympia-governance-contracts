@@ -141,6 +141,7 @@ Mordor on-chain test results: [MORDOR_TEST_REPORT.md](MORDOR_TEST_REPORT.md)
 ## Branch Strategy
 
 - **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true`, CREATE2 salt `OLYMPIA_DEMO_V0_2`
+- **`pre-olympia`** / **`demo_v0.1`**: OZ 5.1.0, deployed to Mordor (predecessor governance set)
 - **`main`**: OZ 5.6.0, Cancun defaults — for post-Olympia production deployments
 
 ## Voting Parameters (Mordor)
@@ -157,9 +158,13 @@ Mordor on-chain test results: [MORDOR_TEST_REPORT.md](MORDOR_TEST_REPORT.md)
 
 ## Related
 
-- [OlympiaTreasury](https://github.com/olympiadao/olympia-treasury-contract) — Treasury vault (ECIP-1112), pure Solidity, immutable executor
+- [Olympia Treasury Contract](https://github.com/olympiadao/olympia-treasury-contract) — Treasury vault (ECIP-1112), pure Solidity, immutable executor
 - [Olympia Framework](https://github.com/olympiadao/olympia-framework) — Full specification library (11 ECIPs)
 - [Olympia App](https://github.com/olympiadao/olympia-app) — Governance dApp (Next.js 16 + wagmi)
+- [OlympiaTreasury.org](https://github.com/olympiadao/olympiatreasury-org) — Treasury monitoring dashboard
+- [OlympiaDAO.org](https://github.com/olympiadao/olympiadao-org) — Landing page
+- [EthereumClassicDAO.org](https://github.com/EthereumClassicDAO/ethereumclassicdao-org) — Institutional website
+- [Olympia Brand](https://github.com/olympiadao/olympia-brand) — Design tokens, logos, favicons
 
 ## License
 
