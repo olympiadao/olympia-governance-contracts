@@ -136,6 +136,8 @@ forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RP
 
 **Total: 106 tests**
 
+Mordor on-chain test results: [MORDOR_TEST_REPORT.md](MORDOR_TEST_REPORT.md)
+
 ## Branch Strategy
 
 - **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true`, CREATE2 salt `OLYMPIA_DEMO_V0_2`
