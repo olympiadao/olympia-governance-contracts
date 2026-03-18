@@ -9,7 +9,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC5192} from "./interfaces/IERC5192.sol";
 
 /// @title OlympiaMemberNFT
-/// @notice Soulbound governance NFT for Olympia Demo v0.1 (ECIP-1113)
+/// @notice Soulbound governance NFT for Olympia Demo v0.2 (ECIP-1113)
 /// @dev One soulbound NFT = one vote. Non-transferable after mint. KYC-verified
 ///      accounts receive NFTs via MINTER_ROLE. Auto-delegates on mint so votes
 ///      are active immediately. Uses OZ default block number clock mode.

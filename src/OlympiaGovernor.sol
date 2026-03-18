@@ -17,7 +17,7 @@ import {ISanctionsOracle} from "./interfaces/ISanctionsOracle.sol";
 
 /// @title OlympiaGovernor
 /// @notice CoreDAO Governor with 3-layer sanctions defense (ECIP-1113, ECIP-1119)
-/// @dev Demo v0.1: GovernorVotes reads OlympiaMemberNFT directly. One soulbound NFT = one vote.
+/// @dev Demo v0.2: GovernorVotes reads OlympiaMemberNFT directly. One soulbound NFT = one vote.
 contract OlympiaGovernor is
     Governor,
     GovernorSettings,

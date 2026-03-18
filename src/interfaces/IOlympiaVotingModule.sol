@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 /// @title IOlympiaVotingModule
 /// @notice Modular voting power interface for OlympiaGovernor (ECIP-1113)
-/// @dev Olympia Demo v0.1 uses standard OZ GovernorVotes with soulbound
+/// @dev Olympia Demo v0.2 uses standard OZ GovernorVotes with soulbound
 ///      OlympiaMemberNFT. This interface defines the swappable voting module
 ///      pattern for governance-gated upgrades via OIP in future releases.
 interface IOlympiaVotingModule {

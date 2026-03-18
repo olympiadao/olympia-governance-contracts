@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 /// @title ISanctionsOracle
 /// @notice Interface for querying sanctioned addresses (ECIP-1119)
-/// @dev Olympia Demo v0.1 — used by OlympiaGovernor for 3-layer sanctions defense
+/// @dev Olympia Demo v0.2 — used by OlympiaGovernor for 3-layer sanctions defense
 interface ISanctionsOracle {
     /// @notice Emitted when an address is added to the sanctions list
     event AddressAdded(address indexed account);
