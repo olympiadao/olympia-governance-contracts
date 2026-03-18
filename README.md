@@ -90,22 +90,22 @@ Demo v0.2 uses **OZ 5.1** because Mordor and ETC mainnet only support **Shanghai
 
 ## Deployments
 
-### Demo v0.2 (Pre-Olympia, OZ 5.1 Governance)
+### Demo v0.2 (Pre-Olympia, OZ 5.1 Governance) — Deployed
 
-All governance contracts deploy via **CREATE2** (deterministic deployer factory `0x4e59b44847b379578588920cA78FbF26c0B4956C`). Treasury deploys via **CREATE** (nonce-based) from the [treasury repo](https://github.com/olympiadao/olympia-treasury-contract).
+All governance contracts deployed via **CREATE2** (deterministic deployer factory `0x4e59b44847b379578588920cA78FbF26c0B4956C`). Treasury deployed via **CREATE** (nonce-based) from the [treasury repo](https://github.com/olympiadao/olympia-treasury-contract). All source code verified on Blockscout.
 
 Deployer: `0x7C3311F29e318617fed0833E68D6522948AaE995` (fresh EOA, nonce 0)
 Salt: `keccak256("OLYMPIA_DEMO_V0_2")`
 
-| Contract | Address |
-|----------|---------|
-| OlympiaTreasury | `0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf` |
-| SanctionsOracle | `0xfF2B8D7937D908D81C72D20AC99302EE6ACc2709` |
-| OlympiaMemberNFT | `0x73e78d3a3470396325b975FcAFA8105A89A9E672` |
-| TimelockController | `0xA5839b3e9445f7eE7AffdBC796DC0601f9b976C2` |
-| OlympiaGovernor | `0xB85dbc899472756470EF4033b9637ff8fa2FD23D` |
-| OlympiaExecutor | `0x64624f74F77639CbA268a6c8bEDC2778B707eF9a` |
-| ECFPRegistry | `0x184D79518D3e5D30e8B991aAFCF075f02f264F21` |
+| Contract | Address (identical on Mordor + ETC mainnet) |
+|----------|---------------------------------------------|
+| OlympiaTreasury | [`0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf`](https://etc.blockscout.com/address/0x035b2e3c189b772e52f4c3da6c45c84a3bb871bf) |
+| SanctionsOracle | [`0xfF2B8D7937D908D81C72D20AC99302EE6ACc2709`](https://etc.blockscout.com/address/0xff2b8d7937d908d81c72d20ac99302ee6acc2709) |
+| OlympiaMemberNFT | [`0x73e78d3a3470396325b975FcAFA8105A89A9E672`](https://etc.blockscout.com/address/0x73e78d3a3470396325b975fcafa8105a89a9e672) |
+| TimelockController | [`0xA5839b3e9445f7eE7AffdBC796DC0601f9b976C2`](https://etc.blockscout.com/address/0xa5839b3e9445f7ee7affdbc796dc0601f9b976c2) |
+| OlympiaGovernor | [`0xB85dbc899472756470EF4033b9637ff8fa2FD23D`](https://etc.blockscout.com/address/0xb85dbc899472756470ef4033b9637ff8fa2fd23d) |
+| OlympiaExecutor | [`0x64624f74F77639CbA268a6c8bEDC2778B707eF9a`](https://etc.blockscout.com/address/0x64624f74f77639cba268a6c8bedc2778b707ef9a) |
+| ECFPRegistry | [`0x184D79518D3e5D30e8B991aAFCF075f02f264F21`](https://etc.blockscout.com/address/0x184d79518d3e5d30e8b991aafcf075f02f264f21) |
 
 **Deployment order:**
 1. Deploy Treasury (CREATE, nonce 0) — executor address pre-computed but has no code yet
