@@ -122,7 +122,7 @@ forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RP
 
 ## Branch Strategy
 
-- **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true`, CREATE2 salt `OLYMPIA_DEMO_V0.2`
+- **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true`, CREATE2 salt `OLYMPIA_DEMO_V0_2`
 - **`demo_v0.1`** / **`pre-olympia`**: OZ 5.1.0, deployed to Mordor (demo v0.1 governance suite)
 - **`main`**: OZ 5.6.0, Cancun defaults — for post-Olympia production deployments
 

@@ -14,8 +14,8 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 /// @dev Uses CREATE2 for deterministic addresses. Resolves circular dependency between Timelock and Governor
 ///      by precomputing the Governor address before deploying the Timelock.
 contract DeployGovernance is Script {
-    // CREATE2 salt — same as Treasury for Demo v0.1
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_1");
+    // CREATE2 salt — Demo v0.2 (pre-Olympia Mordor testing)
+    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_2");
 
     // Mordor testnet parameters
     uint256 constant TIMELOCK_DELAY = 3600; // 1 hour
@@ -25,8 +25,9 @@ contract DeployGovernance is Script {
     uint48 constant LATE_QUORUM_EXTENSION = 50; // ~11 minutes
     uint256 constant MIN_REVIEW_PERIOD = 86400; // 1 day
 
-    // Treasury (deployed in Phase 1, same address on Mordor + ETC mainnet)
-    address constant TREASURY = 0xd6165F3aF4281037bce810621F62B43077Fb0e37;
+    // Treasury (demo v0.2, pure Solidity immutable executor)
+    // Set after deploying Treasury with PrecomputeAddresses.s.sol
+    address constant TREASURY = address(0); // TODO: set after Treasury deployment
 
     function run() public {
         address deployer = msg.sender;
@@ -35,7 +36,7 @@ contract DeployGovernance is Script {
         address sanctionsOracle = vm.envAddress("SANCTIONS_ORACLE");
         address memberNFT = vm.envAddress("MEMBER_NFT");
 
-        console.log("=== Olympia Governance Deployment (Demo v0.1) ===");
+        console.log("=== Olympia Governance Deployment (Demo v0.2) ===");
         console.log("Deployer:", deployer);
         console.log("SanctionsOracle:", sanctionsOracle);
         console.log("MemberNFT:", memberNFT);
@@ -83,8 +84,7 @@ contract DeployGovernance is Script {
         console.log("=== Deployment Complete ===");
         console.log("");
         console.log("Next steps:");
-        console.log("  1. Grant WITHDRAWER_ROLE on Treasury to Executor:");
-        console.log("     cast send TREASURY 'grantRole(bytes32,address)' <WITHDRAWER_ROLE> <EXECUTOR>");
+        console.log("  1. Verify OlympiaExecutor address matches Treasury's immutable executor");
         console.log("  2. Grant GOVERNOR_ROLE on ECFPRegistry to Timelock (for governance-gated transitions):");
         console.log("     cast send REGISTRY 'grantRole(bytes32,address)' <GOVERNOR_ROLE> <TIMELOCK>");
         console.log("  3. Optionally renounce deployer's PROPOSER/EXECUTOR/CANCELLER roles on Timelock");
