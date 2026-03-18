@@ -113,10 +113,6 @@ Salt: `keccak256("OLYMPIA_DEMO_V0_2")`
 3. Deploy Governance (CREATE2) — Timelock, Governor, Executor, ECFPRegistry
 4. Verify: `treasury.executor() == OlympiaExecutor address`
 
-### Demo v0.1 (Mordor + ETC mainnet)
-
-Preserved on the `demo_v0.1` branch. Mixed OZ versions: Governor OZ 5.1 (Shanghai), other contracts OZ 5.6. See [DEPLOYMENT.md](DEPLOYMENT.md) for full address matrix.
-
 ## Quick Commands
 
 ```bash
@@ -152,7 +148,6 @@ forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RP
 ## Branch Strategy
 
 - **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true`, CREATE2 salt `OLYMPIA_DEMO_V0_2`
-- **`demo_v0.1`**: OZ 5.1.0, deployed to Mordor + ETC mainnet (demo v0.1 governance suite)
 - **`main`**: OZ 5.6.0, Cancun defaults — for post-Olympia production deployments
 
 ## Voting Parameters (Mordor)

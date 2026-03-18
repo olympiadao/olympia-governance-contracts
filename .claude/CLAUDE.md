@@ -67,7 +67,6 @@ ECFPRegistry.submit() → OlympiaGovernor.propose() [Layer 1]
 ## Branch Strategy
 
 - **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true` — full ECIP-1114 compliance
-- **`demo_v0.1`** / **`pre-olympia`**: OZ 5.1.0, deployed to Mordor (demo v0.1)
 - **`main`**: OZ 5.6.0, Cancun defaults — for post-Olympia deployments
 
 ## Voting Parameters (Mordor)
