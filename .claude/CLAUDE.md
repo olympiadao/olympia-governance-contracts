@@ -19,7 +19,7 @@ Production-target governance contracts for Olympia on Ethereum Classic. Implemen
 
 ```bash
 forge build          # Compile
-forge test -vv       # Run tests (106 tests)
+forge test -vv       # Run tests (111 tests)
 forge fmt            # Format Solidity
 forge snapshot       # Gas snapshots
 ```

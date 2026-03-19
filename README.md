@@ -112,7 +112,7 @@ Salt: `keccak256("OLYMPIA_DEMO_V0_2")`
 
 ```bash
 forge build          # Compile
-forge test -vv       # Run tests (106 tests)
+forge test -vv       # Run tests (111 tests)
 forge fmt            # Format Solidity
 ```
 
@@ -132,13 +132,13 @@ forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $MORDOR_RP
 | Test Suite | Count | Coverage |
 |------------|-------|----------|
 | SanctionsOracle | 14 | Add/remove, isSanctioned, access control, edge cases |
-| OlympiaMemberNFT | 19 | Mint, auto-delegate, soulbound, ERC5192, getPastVotes |
+| OlympiaMemberNFT | 24 | Mint, revoke (REVOKER_ROLE), auto-delegate, soulbound, ERC5192, getPastVotes |
 | OlympiaExecutor | 9 | Constructor, executeTreasury, access control, sanctions |
 | OlympiaGovernor | 21 | Propose, vote, queue, execute, cancelIfSanctioned, quorum |
 | ECFPRegistry | 38 | Submit, input validation, draft lifecycle, review period, status transitions, permissionless access |
 | GovernancePipeline | 5 | End-to-end: all 3 sanctions layers, self-upgrade |
 
-**Total: 106 tests**
+**Total: 111 tests**
 
 Mordor on-chain test results: [MORDOR_TEST_REPORT.md](MORDOR_TEST_REPORT.md)
 
