@@ -2,9 +2,9 @@
 
 ## Project Context
 
-Production-target governance contracts for Olympia on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.6.0 (Cancun EVM, post-Olympia) with soulbound NFT voting. API migration from OZ 5.1 → 5.6 happens at production deployment time.
+Production-target governance contracts for Olympia on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry with draft lifecycle, review period, input validation), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.6.0 (Cancun EVM, post-Olympia) with soulbound NFT voting.
 
-> **Production** — Olympia ECIP spec compliant. Drafted for future production deployment on Mordor and ETC mainnet. Post-Olympia EVM (Cancun), OpenZeppelin v5.6.0. Governance deploys after Olympia hard fork via CREATE2. Same addresses on Mordor and ETC mainnet.
+> **Production** — Olympia ECIP spec compliant. Post-Olympia EVM (Fusaka via ECIP-1121 + ECIP-1111), OpenZeppelin v5.6.0. Production addresses TBD.
 
 **Repo:** `olympiadao/olympia-governance-contracts`
 
@@ -12,14 +12,14 @@ Production-target governance contracts for Olympia on Ethereum Classic. Implemen
 
 - Solidity 0.8.28
 - Foundry (Forge, Cast, Anvil)
-- OpenZeppelin Contracts v5.6.0 (Cancun EVM, production target)
+- OpenZeppelin Contracts v5.6.0 (Cancun EVM, post-Olympia production target)
 - Target chains: Mordor testnet (63), ETC mainnet (61)
 
 ## Quick Commands
 
 ```bash
 forge build          # Compile
-forge test -vv       # Run tests (87 tests)
+forge test -vv       # Run tests (106 tests)
 forge fmt            # Format Solidity
 forge snapshot       # Gas snapshots
 ```
@@ -42,7 +42,7 @@ forge script script/DeployGovernance.s.sol:DeployGovernance --rpc-url $ETC_RPC_U
 |----------|------|---------|
 | OlympiaGovernor | 1113 | Governor with 3-layer sanctions defense, OIP self-upgrade |
 | OlympiaExecutor | 1113 | Layer 3 sanctions gate between Timelock and Treasury |
-| ECFPRegistry | 1114 | Hash-bound funding proposals with GOVERNOR_ROLE |
+| ECFPRegistry | 1114 | Hash-bound funding proposals with draft lifecycle, review period, input validation |
 | SanctionsOracle | 1119 | On-chain sanctions list with MANAGER_ROLE |
 | OlympiaMemberNFT | 1113 | Soulbound governance NFT (1 NFT = 1 vote) |
 
@@ -65,10 +65,27 @@ ECFPRegistry.submit() → OlympiaGovernor.propose() [Layer 1]
   → OlympiaTreasury.withdraw()
 ```
 
-## Related Deployments
+## Deployments
 
-- Treasury: TBD (production deployer, nonce 0, CREATE address differs from demo)
-- Governance contracts: TBD (production CREATE2 addresses differ from demo — OZ 5.6 bytecode)
+Production addresses TBD — deploy after Olympia activation. OZ 5.6 bytecode produces different CREATE2 addresses than demo v0.2.
+
+## Branch Strategy
+
+- **`main`**: OZ 5.6.0, Cancun EVM — production target (post-Olympia)
+- **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true` — live testing (pre-Olympia)
+- **`demo_v0.1`**: Archived — initial scaffolding
+
+## Voting Parameters (Mordor)
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Voting Delay | 1 block (~13s) | Time before voting starts |
+| Voting Period | 100 blocks (~22 min) | Voting window duration |
+| Quorum | 10% of NFT supply | Minimum 'For' votes needed |
+| Late Quorum Extension | 50 blocks (~11 min) | Extension if quorum reached late |
+| Timelock Delay | 3600s (1 hour) | Waiting period before execution |
+| Proposal Threshold | 0 | Any NFT holder can propose |
+| Min Review Period | 300s (5 min) | ECFP draft review before activation |
 
 ## Boundaries
 

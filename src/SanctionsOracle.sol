@@ -6,7 +6,7 @@ import {ISanctionsOracle} from "./interfaces/ISanctionsOracle.sol";
 
 /// @title SanctionsOracle
 /// @notice On-chain sanctions list with role-gated management (ECIP-1119)
-/// @dev Olympia Demo v0.1 — MANAGER_ROLE can add/remove sanctioned addresses.
+/// @dev Olympia Demo v0.2 — MANAGER_ROLE can add/remove sanctioned addresses.
 ///      Used by OlympiaGovernor for 3-layer sanctions defense:
 ///      Layer 1: Block sanctioned proposers at propose()
 ///      Layer 2: Permissionless cancel of sanctioned proposals

@@ -9,8 +9,8 @@ import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
 /// @notice Deploys Phase 2A foundation contracts: SanctionsOracle + OlympiaMemberNFT
 /// @dev Uses CREATE2 for deterministic addresses. Run before DeployGovernance.
 contract DeployFoundation is Script {
-    // CREATE2 salt — same as Treasury and Governance for Demo v0.1
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_1");
+    // CREATE2 salt — Demo v0.2 (pre-Olympia Mordor testing)
+    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_2");
 
     // Dev wallet for initial NFT mint
     address constant DEV_WALLET = 0x3b0952fB8eAAC74E56E176102eBA70BAB1C81537;
@@ -18,7 +18,7 @@ contract DeployFoundation is Script {
     function run() public {
         address deployer = msg.sender;
 
-        console.log("=== Olympia Foundation Deployment (Demo v0.1) ===");
+        console.log("=== Olympia Foundation Deployment (Demo v0.2) ===");
         console.log("Deployer:", deployer);
         console.log("Dev wallet:", DEV_WALLET);
         console.log("");

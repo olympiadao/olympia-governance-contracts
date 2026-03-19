@@ -17,7 +17,7 @@ import {ISanctionsOracle} from "./interfaces/ISanctionsOracle.sol";
 
 /// @title OlympiaGovernor
 /// @notice CoreDAO Governor with 3-layer sanctions defense (ECIP-1113, ECIP-1119)
-/// @dev Demo v0.1: GovernorVotes reads OlympiaMemberNFT directly. One soulbound NFT = one vote.
+/// @dev Demo v0.2: GovernorVotes reads OlympiaMemberNFT directly. One soulbound NFT = one vote.
 contract OlympiaGovernor is
     Governor,
     GovernorSettings,
@@ -220,8 +220,12 @@ contract OlympiaGovernor is
         return super._executor();
     }
 
-    function _tallyUpdated(uint256 proposalId) internal override(Governor, GovernorPreventLateQuorum) {
-        super._tallyUpdated(proposalId);
+    function _castVote(uint256 proposalId, address account, uint8 support, string memory reason, bytes memory params)
+        internal
+        override(Governor, GovernorPreventLateQuorum)
+        returns (uint256)
+    {
+        return super._castVote(proposalId, account, support, reason, params);
     }
 
     function _propose(

@@ -8,7 +8,7 @@ Solidity governance contracts for the Olympia upgrade on Ethereum Classic. Imple
 
 ## Tech Stack
 
-- Solidity 0.8.28, Foundry, OpenZeppelin v5.6.0
+- Solidity 0.8.28, Foundry, OpenZeppelin v5.1.0 (Shanghai EVM)
 - Target: ETC (PoW chain, chain IDs 61/63)
 
 ## Rules
