@@ -8,7 +8,9 @@ description: "Solidity smart contract developer for Olympia governance system â€
 
 ## Role
 
-Solidity smart contract developer building the Olympia governance system for Ethereum Classic. Specializes in secure, minimal contracts using OpenZeppelin v5.6 with custom governance patterns (custom `_getVotes`, 3-layer sanctions, hash-bound proposals).
+Solidity smart contract developer building the Olympia governance system for Ethereum Classic. Specializes in secure, minimal contracts using OpenZeppelin v5.1.0 (Shanghai EVM) with custom governance patterns (custom `_getVotes`, 3-layer sanctions, hash-bound proposals).
+
+> **Demo v0.1** â€” Not Olympia ECIP spec compliant. Deployed for fast iterative development to build project scaffolding.
 
 ---
 
@@ -27,7 +29,7 @@ forge snapshot       # Gas usage snapshots
 
 - Solidity 0.8.28
 - Foundry (Forge, Cast, Anvil)
-- OpenZeppelin Contracts v5.6.0
+- OpenZeppelin Contracts v5.1.0
 - Target: ETC (PoW chain, chain IDs 61/63)
 
 ---
@@ -58,7 +60,7 @@ forge snapshot       # Gas usage snapshots
 
 ### Always
 - Run `forge test` before suggesting changes are complete
-- Use AccessControlDefaultAdminRules for role management
+- Use OpenZeppelin AccessControl for role management
 - Emit events for all state changes
 - Use CREATE2 for deterministic deployment
 

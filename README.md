@@ -1,5 +1,7 @@
 # Olympia Governance Contracts
 
+> **Demo v0.1** — Not Olympia ECIP spec compliant. Deployed for fast iterative development to build project scaffolding. Not for production use. See `demo_v0.2` for the spec-aligned deployment.
+
 Governance pipeline contracts for the Olympia Demo v0.1 on Ethereum Classic (ECIP-1113, ECIP-1114, ECIP-1119).
 
 ## Contracts
@@ -56,7 +58,7 @@ OlympiaTreasury.withdraw(recipient, amount)
 | Component | Version |
 |-----------|---------|
 | Solidity | 0.8.28 |
-| OpenZeppelin | v5.6.0 |
+| OpenZeppelin | v5.1.0 (Shanghai EVM) |
 | Foundry | Latest |
 | Target chains | Mordor (63), ETC mainnet (61) |
 
