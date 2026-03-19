@@ -168,6 +168,65 @@ contract OlympiaMemberNFTTest is Test {
         assertTrue(nft.supportsInterface(type(IAccessControl).interfaceId));
     }
 
+    // --- Revocation ---
+
+    function test_revoke_burnsMembership() public {
+        vm.prank(admin);
+        nft.safeMint(alice);
+        assertEq(nft.totalSupply(), 1);
+
+        vm.prank(admin);
+        nft.revoke(0);
+
+        vm.expectRevert();
+        nft.ownerOf(0);
+        assertEq(nft.balanceOf(alice), 0);
+        assertEq(nft.totalSupply(), 0);
+    }
+
+    function test_revoke_decrementsVotingPower() public {
+        vm.prank(admin);
+        nft.safeMint(alice);
+        assertEq(nft.getVotes(alice), 1);
+
+        vm.prank(admin);
+        nft.revoke(0);
+        assertEq(nft.getVotes(alice), 0);
+    }
+
+    function test_revoke_revertsWithoutRevokerRole() public {
+        vm.prank(admin);
+        nft.safeMint(alice);
+
+        bytes32 revokerRole = nft.REVOKER_ROLE();
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, revokerRole)
+        );
+        vm.prank(alice);
+        nft.revoke(0);
+    }
+
+    function test_revoke_revertsForNonexistentToken() public {
+        vm.prank(admin);
+        vm.expectRevert();
+        nft.revoke(999);
+    }
+
+    function test_revoke_adminCanGrantRevokerRole() public {
+        address revoker = makeAddr("revoker");
+        bytes32 revokerRole = nft.REVOKER_ROLE();
+        vm.prank(admin);
+        nft.grantRole(revokerRole, revoker);
+        assertTrue(nft.hasRole(revokerRole, revoker));
+
+        vm.prank(admin);
+        nft.safeMint(alice);
+
+        vm.prank(revoker);
+        nft.revoke(0);
+        assertEq(nft.balanceOf(alice), 0);
+    }
+
     // --- Access control ---
 
     function test_adminCanGrantMinterRole() public {

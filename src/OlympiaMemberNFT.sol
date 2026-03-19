@@ -9,13 +9,17 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC5192} from "./interfaces/IERC5192.sol";
 
 /// @title OlympiaMemberNFT
-/// @notice Soulbound governance NFT for Olympia Demo v0.2 (ECIP-1113)
+/// @notice Soulbound governance NFT for Olympia (ECIP-1113)
 /// @dev One soulbound NFT = one vote. Non-transferable after mint. KYC-verified
-///      accounts receive NFTs via MINTER_ROLE. Auto-delegates on mint so votes
-///      are active immediately. Uses OZ default block number clock mode.
+///      accounts receive NFTs via MINTER_ROLE. Compromised or ineligible members
+///      can be removed via REVOKER_ROLE. Auto-delegates on mint so votes are
+///      active immediately. Uses OZ default block number clock mode.
 contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, AccessControl {
     /// @notice Role that can mint new membership NFTs
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    /// @notice Role that can revoke (burn) membership NFTs
+    bytes32 public constant REVOKER_ROLE = keccak256("REVOKER_ROLE");
 
     /// @dev Auto-incrementing token ID counter
     uint256 private _nextTokenId;
@@ -27,6 +31,7 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     constructor(address admin) ERC721("Olympia Member", "OLYMPIA") EIP712("Olympia Member", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(MINTER_ROLE, admin);
+        _grantRole(REVOKER_ROLE, admin);
     }
 
     /// @notice Mint a new membership NFT to a verified address
@@ -34,6 +39,12 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     function safeMint(address to) external onlyRole(MINTER_ROLE) {
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
+    }
+
+    /// @notice Revoke a membership NFT (burn). Used to remove compromised or ineligible members.
+    /// @param tokenId The token to revoke
+    function revoke(uint256 tokenId) external onlyRole(REVOKER_ROLE) {
+        _burn(tokenId);
     }
 
     /// @inheritdoc IERC5192
