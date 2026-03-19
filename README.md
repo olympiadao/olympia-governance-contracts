@@ -77,7 +77,7 @@ OlympiaTreasury.withdraw(recipient, amount)
 
 ## OZ 5.1 Constraint
 
-OZ 5.1.0 is required because Mordor and ETC mainnet only support Shanghai EVM until the Olympia hard fork activates (block 15,800,850). OZ 5.2+ uses `mcopy` (EIP-5656, Cancun-only).
+OZ 5.1.0 is required because Mordor and ETC mainnet only support Shanghai EVM until the Olympia hard fork activates. OZ 5.2+ uses `mcopy` (EIP-5656, Cancun-only).
 
 Production deployment will use OZ 5.6 after Olympia activates Cancun. Different bytecode produces different CREATE2 addresses, requiring a separate Treasury deployment.
 

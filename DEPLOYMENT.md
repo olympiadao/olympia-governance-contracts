@@ -154,7 +154,7 @@
 | via_ir | Required (bytecode > 8M gas) | Optional (60M gas limit) |
 | Governor API | `_castVote` override | `_tallyUpdated` override |
 | Block Gas Limit | 8,000,000 | 60,000,000 |
-| Activation | Now | Block 15,800,850 (~Mar 28) |
+| Activation | Now | Block TBD |
 
 ---
 
