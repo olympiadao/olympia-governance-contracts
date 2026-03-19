@@ -2,7 +2,9 @@
 
 ## Project Context
 
-Solidity governance contracts for the Olympia Demo v0.1 on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.6 with soulbound NFT voting.
+Production-target governance contracts for Olympia on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.6.0 (Cancun EVM, post-Olympia) with soulbound NFT voting. API migration from OZ 5.1 → 5.6 happens at production deployment time.
+
+> **Production** — Olympia ECIP spec compliant. Drafted for future production deployment on Mordor and ETC mainnet. Post-Olympia EVM (Cancun), OpenZeppelin v5.6.0. Governance deploys after Olympia hard fork via CREATE2. Same addresses on Mordor and ETC mainnet.
 
 **Repo:** `olympiadao/olympia-governance-contracts`
 
@@ -10,7 +12,7 @@ Solidity governance contracts for the Olympia Demo v0.1 on Ethereum Classic. Imp
 
 - Solidity 0.8.28
 - Foundry (Forge, Cast, Anvil)
-- OpenZeppelin Contracts v5.6.0
+- OpenZeppelin Contracts v5.6.0 (Cancun EVM, production target)
 - Target chains: Mordor testnet (63), ETC mainnet (61)
 
 ## Quick Commands
@@ -65,8 +67,8 @@ ECFPRegistry.submit() → OlympiaGovernor.propose() [Layer 1]
 
 ## Related Deployments
 
-- Treasury: `0xd6165F3aF4281037bce810621F62B43077Fb0e37` (Mordor + ETC mainnet)
-- Governance contracts: TBD (Demo v0.1, OLYMPIA_DEMO_V0_1 salt)
+- Treasury: TBD (production deployer, nonce 0, CREATE address differs from demo)
+- Governance contracts: TBD (production CREATE2 addresses differ from demo — OZ 5.6 bytecode)
 
 ## Boundaries
 

@@ -1,6 +1,8 @@
 # Olympia Governance Contracts
 
-Governance pipeline contracts for the Olympia Demo v0.1 on Ethereum Classic (ECIP-1113, ECIP-1114, ECIP-1119).
+> **Production** — Olympia ECIP spec compliant. Drafted for future production deployment on Mordor and ETC mainnet. Post-Olympia EVM (Cancun), OpenZeppelin v5.6.0. Governance deploys after Olympia hard fork via CREATE2. Same addresses on Mordor and ETC mainnet.
+
+Production-target governance pipeline contracts for Olympia on Ethereum Classic (ECIP-1113, ECIP-1114, ECIP-1119).
 
 ## Contracts
 

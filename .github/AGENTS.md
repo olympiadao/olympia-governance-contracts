@@ -58,7 +58,7 @@ forge snapshot       # Gas usage snapshots
 
 ### Always
 - Run `forge test` before suggesting changes are complete
-- Use AccessControlDefaultAdminRules for role management
+- Use OpenZeppelin AccessControl for role management
 - Emit events for all state changes
 - Use CREATE2 for deterministic deployment
 

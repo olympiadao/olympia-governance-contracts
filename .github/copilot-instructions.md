@@ -14,7 +14,7 @@ Solidity governance contracts for the Olympia upgrade on Ethereum Classic. Imple
 ## Rules
 
 - All contracts use SPDX-License-Identifier: MIT
-- Use OpenZeppelin AccessControlDefaultAdminRules (v5.6) for role management
+- Use OpenZeppelin AccessControl for role management
 - Use CREATE2 for deterministic deployment addresses
 - Tests use Forge Test with vm.prank/vm.deal/vm.expectRevert
 - No upgradeable proxies — contracts are immutable
