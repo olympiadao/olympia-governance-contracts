@@ -1,5 +1,7 @@
 # Olympia Governance Contracts
 
+> **Demo v0.2** — Olympia ECIP spec compliant. Deployed for live Mordor and ETC mainnet development testing. Pre-Olympia EVM (Shanghai), OpenZeppelin v5.1.0. Not production.
+
 Governance pipeline contracts for Olympia Demo v0.2 on Ethereum Classic (ECIP-1113, ECIP-1114, ECIP-1119). Built on **OpenZeppelin v5.1.0** with soulbound NFT voting, deployable on Shanghai EVM (pre-Olympia).
 
 ## Contracts
