@@ -27,6 +27,7 @@ mnemonic.txt
 
 # Claude internal
 .claude/SESSION_NOTES.md
+.claude/NEXT-STEPS.md
 .claude/reports/
 .claude/debug.log
 SESSION_NOTES.md
