@@ -2,7 +2,7 @@
 
 ## Project Context
 
-Solidity governance contracts for the Olympia Demo v0.2 on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry with draft lifecycle, review period, input validation), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.1.0 (Shanghai EVM) with soulbound NFT voting.
+Solidity governance contracts for the Olympia Demo v0.3 on Ethereum Classic. Implements ECIP-1113 (OlympiaGovernor, OlympiaExecutor, TimelockController), ECIP-1114 (ECFPRegistry with draft lifecycle, review period, input validation), and ECIP-1119 (SanctionsOracle). Built on OpenZeppelin v5.1.0 (Shanghai EVM) with soulbound NFT voting, on-chain SVG renderer, and merkle/attestation membership verification.
 
 **Repo:** `olympiadao/olympia-governance-contracts`
 
@@ -66,8 +66,9 @@ ECFPRegistry.submit() → OlympiaGovernor.propose() [Layer 1]
 
 ## Branch Strategy
 
-- **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true` — full ECIP-1114 compliance
 - **`main`**: OZ 5.6.0, Cancun defaults — for post-Olympia deployments
+- **`demo_v0.3`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true` — 9 contracts, on-chain SVG, sybil resistance
+- **`demo_v0.2`**: OZ 5.1.0, `evm_version=shanghai`, `via_ir=true` — 7 contracts
 
 ## Voting Parameters (Mordor)
 
