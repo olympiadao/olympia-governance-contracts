@@ -7,6 +7,7 @@ import {ERC721Votes} from "@openzeppelin/contracts/token/ERC721/extensions/ERC72
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC5192} from "./interfaces/IERC5192.sol";
+import {IMembershipVerifier} from "./interfaces/IMembershipVerifier.sol";
 import {IOlympiaMemberRenderer} from "./nft/IOlympiaMemberRenderer.sol";
 
 /// @title OlympiaMemberNFT
@@ -28,6 +29,9 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     /// @notice Metadata renderer contract (generates on-chain SVG art)
     IOlympiaMemberRenderer public renderer;
 
+    /// @notice Membership verifier contract (sybil resistance, ECIP-1113 §2)
+    IMembershipVerifier public verifier;
+
     /// @notice Block number at which each token was minted
     mapping(uint256 => uint256) public mintBlocks;
 
@@ -37,6 +41,9 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     /// @notice Address already holds a membership NFT
     error AlreadyMember(address account);
 
+    /// @notice Address has not been verified by the membership verifier
+    error NotVerified(address account);
+
     /// @param admin Address that receives DEFAULT_ADMIN_ROLE and MINTER_ROLE
     constructor(address admin) ERC721("Olympia Member v0.3", "OLYMPIAv03") EIP712("Olympia Member v0.3", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -45,11 +52,20 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     }
 
     /// @notice Mint a new membership NFT to a verified address
-    /// @param to The recipient address (must have passed KYC/identity verification)
+    /// @param to The recipient address (must pass verifier check if verifier is set)
     function safeMint(address to) external onlyRole(MINTER_ROLE) {
+        if (address(verifier) != address(0) && !verifier.isVerified(to)) {
+            revert NotVerified(to);
+        }
         if (balanceOf(to) > 0) revert AlreadyMember(to);
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
+    }
+
+    /// @notice Set or update the membership verifier contract
+    /// @param _verifier Address of the new verifier (or address(0) to disable verification)
+    function setVerifier(address _verifier) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        verifier = IMembershipVerifier(_verifier);
     }
 
     /// @notice Revoke a membership NFT (burn). Used to remove compromised or ineligible members.

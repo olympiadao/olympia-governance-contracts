@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
+import {MembershipVerifier} from "../src/nft/MembershipVerifier.sol";
 import {IERC5192} from "../src/interfaces/IERC5192.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -305,6 +306,55 @@ contract OlympiaMemberNFTTest is Test {
         assertTrue(nft.hasRole(minterRole, minter));
 
         vm.prank(minter);
+        nft.safeMint(alice);
+        assertEq(nft.ownerOf(0), alice);
+    }
+
+    // --- Verifier integration ---
+
+    function test_setVerifier_onlyAdmin() public {
+        address fakeVerifier = makeAddr("verifier");
+        bytes32 adminRole = nft.DEFAULT_ADMIN_ROLE();
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, adminRole)
+        );
+        vm.prank(alice);
+        nft.setVerifier(fakeVerifier);
+    }
+
+    function test_setVerifier_setsAddress() public {
+        address fakeVerifier = makeAddr("verifier");
+        vm.prank(admin);
+        nft.setVerifier(fakeVerifier);
+        assertEq(address(nft.verifier()), fakeVerifier);
+    }
+
+    function test_safeMint_succeedsWithoutVerifier() public {
+        // No verifier set — should work as before (backward compat)
+        vm.prank(admin);
+        nft.safeMint(alice);
+        assertEq(nft.ownerOf(0), alice);
+    }
+
+    function test_safeMint_revertsIfNotVerified() public {
+        MembershipVerifier verifier = new MembershipVerifier(admin);
+        vm.prank(admin);
+        nft.setVerifier(address(verifier));
+
+        // Alice is not verified — mint should revert
+        vm.expectRevert(abi.encodeWithSelector(OlympiaMemberNFT.NotVerified.selector, alice));
+        vm.prank(admin);
+        nft.safeMint(alice);
+    }
+
+    function test_safeMint_succeedsIfVerified() public {
+        MembershipVerifier verifier = new MembershipVerifier(admin);
+        vm.startPrank(admin);
+        nft.setVerifier(address(verifier));
+        verifier.attest(alice);
+        vm.stopPrank();
+
+        vm.prank(admin);
         nft.safeMint(alice);
         assertEq(nft.ownerOf(0), alice);
     }
