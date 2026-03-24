@@ -227,11 +227,7 @@ contract OlympiaGovernorTest is Test {
         assertEq(abstainVotes, 0);
     }
 
-    function test_castVote_weightEqualsNFTCount() public {
-        // Mint a second NFT to alice
-        vm.prank(admin);
-        nft.safeMint(alice); // tokenId 3
-
+    function test_castVote_weightEqualsOnePerMember() public {
         uint256 proposalId = _proposeWithdrawal(recipient, 1 ether, "Weight test");
         _advancePastVotingDelay();
 
@@ -239,7 +235,7 @@ contract OlympiaGovernorTest is Test {
         governor.castVote(proposalId, 1);
 
         (, uint256 forVotes,) = governor.proposalVotes(proposalId);
-        assertEq(forVotes, 2); // 2 NFTs = 2 votes
+        assertEq(forVotes, 1); // 1 NFT = 1 vote (one-address-one-vote)
     }
 
     // =========================================================================

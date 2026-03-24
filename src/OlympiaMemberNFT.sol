@@ -34,6 +34,9 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     /// @notice Transfer of soulbound tokens is not allowed
     error SoulboundTransferBlocked();
 
+    /// @notice Address already holds a membership NFT
+    error AlreadyMember(address account);
+
     /// @param admin Address that receives DEFAULT_ADMIN_ROLE and MINTER_ROLE
     constructor(address admin) ERC721("Olympia Member v0.3", "OLYMPIAv03") EIP712("Olympia Member v0.3", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -44,6 +47,7 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     /// @notice Mint a new membership NFT to a verified address
     /// @param to The recipient address (must have passed KYC/identity verification)
     function safeMint(address to) external onlyRole(MINTER_ROLE) {
+        if (balanceOf(to) > 0) revert AlreadyMember(to);
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
     }

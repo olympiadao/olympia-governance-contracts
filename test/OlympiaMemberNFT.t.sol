@@ -64,13 +64,32 @@ contract OlympiaMemberNFTTest is Test {
         assertEq(nft.delegates(alice), alice);
     }
 
-    function test_safeMint_multipleMintsAccumulateVotes() public {
+    function test_safeMint_revertsIfAlreadyMember() public {
         vm.startPrank(admin);
         nft.safeMint(alice);
+        vm.expectRevert(abi.encodeWithSelector(OlympiaMemberNFT.AlreadyMember.selector, alice));
         nft.safeMint(alice);
         vm.stopPrank();
-        assertEq(nft.getVotes(alice), 2);
-        assertEq(nft.balanceOf(alice), 2);
+    }
+
+    function test_safeMint_allowsRemintAfterRevoke() public {
+        vm.startPrank(admin);
+        nft.safeMint(alice);
+        assertEq(nft.balanceOf(alice), 1);
+        nft.revoke(0);
+        assertEq(nft.balanceOf(alice), 0);
+        nft.safeMint(alice);
+        assertEq(nft.balanceOf(alice), 1);
+        vm.stopPrank();
+    }
+
+    function test_safeMint_differentAddresses_allowed() public {
+        vm.startPrank(admin);
+        nft.safeMint(alice);
+        nft.safeMint(bob);
+        vm.stopPrank();
+        assertEq(nft.balanceOf(alice), 1);
+        assertEq(nft.balanceOf(bob), 1);
     }
 
     // --- Soulbound ---
@@ -144,10 +163,10 @@ contract OlympiaMemberNFTTest is Test {
     function test_tokenOfOwnerByIndex_works() public {
         vm.startPrank(admin);
         nft.safeMint(alice);
-        nft.safeMint(alice);
+        nft.safeMint(bob);
         vm.stopPrank();
         assertEq(nft.tokenOfOwnerByIndex(alice, 0), 0);
-        assertEq(nft.tokenOfOwnerByIndex(alice, 1), 1);
+        assertEq(nft.tokenOfOwnerByIndex(bob, 0), 1);
     }
 
     // --- supportsInterface ---
