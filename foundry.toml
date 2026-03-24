@@ -8,6 +8,8 @@ optimizer = true
 optimizer_runs = 200
 via_ir = true
 
+fs_permissions = [{ access = "read-write", path = "./samples" }]
+
 [rpc_endpoints]
 mordor = "${MORDOR_RPC_URL}"
 etc = "${ETC_RPC_URL}"

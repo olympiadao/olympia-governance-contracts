@@ -25,6 +25,9 @@ keystore/
 wallet.json
 mnemonic.txt
 
+# Generated samples (visual review only)
+samples/
+
 # Claude internal
 .claude/SESSION_NOTES.md
 .claude/NEXT-STEPS.md

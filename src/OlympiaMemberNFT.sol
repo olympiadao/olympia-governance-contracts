@@ -7,6 +7,7 @@ import {ERC721Votes} from "@openzeppelin/contracts/token/ERC721/extensions/ERC72
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC5192} from "./interfaces/IERC5192.sol";
+import {IOlympiaMemberRenderer} from "./nft/IOlympiaMemberRenderer.sol";
 
 /// @title OlympiaMemberNFT
 /// @notice Soulbound governance NFT for Olympia (ECIP-1113)
@@ -24,11 +25,17 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     /// @dev Auto-incrementing token ID counter
     uint256 private _nextTokenId;
 
+    /// @notice Metadata renderer contract (generates on-chain SVG art)
+    IOlympiaMemberRenderer public renderer;
+
+    /// @notice Block number at which each token was minted
+    mapping(uint256 => uint256) public mintBlocks;
+
     /// @notice Transfer of soulbound tokens is not allowed
     error SoulboundTransferBlocked();
 
     /// @param admin Address that receives DEFAULT_ADMIN_ROLE and MINTER_ROLE
-    constructor(address admin) ERC721("Olympia Member", "OLYMPIA") EIP712("Olympia Member", "1") {
+    constructor(address admin) ERC721("Olympia Member v0.3", "OLYMPIAv03") EIP712("Olympia Member v0.3", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(MINTER_ROLE, admin);
         _grantRole(REVOKER_ROLE, admin);
@@ -45,6 +52,21 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
     /// @param tokenId The token to revoke
     function revoke(uint256 tokenId) external onlyRole(REVOKER_ROLE) {
         _burn(tokenId);
+    }
+
+    /// @notice Set or update the metadata renderer contract
+    /// @param _renderer Address of the new renderer (or address(0) to disable)
+    function setRenderer(address _renderer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        renderer = IOlympiaMemberRenderer(_renderer);
+    }
+
+    /// @notice Returns on-chain metadata and SVG art if renderer is set
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        if (address(renderer) == address(0)) {
+            return "";
+        }
+        return renderer.tokenURI(tokenId, ownerOf(tokenId), mintBlocks[tokenId]);
     }
 
     /// @inheritdoc IERC5192
@@ -68,8 +90,9 @@ contract OlympiaMemberNFT is ERC721, ERC721Enumerable, ERC721Votes, IERC5192, Ac
             revert SoulboundTransferBlocked();
         }
 
-        // On mint: auto-delegate so votes are active immediately
+        // On mint: record block, auto-delegate, emit Locked
         if (from == address(0) && to != address(0)) {
+            mintBlocks[tokenId] = block.number;
             _delegate(to, to);
             emit Locked(tokenId);
         }

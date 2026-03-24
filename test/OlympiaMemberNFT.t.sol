@@ -227,6 +227,56 @@ contract OlympiaMemberNFTTest is Test {
         assertEq(nft.balanceOf(alice), 0);
     }
 
+    // --- Renderer & tokenURI ---
+
+    function test_setRenderer_onlyAdmin() public {
+        address fakeRenderer = makeAddr("renderer");
+        bytes32 adminRole = nft.DEFAULT_ADMIN_ROLE();
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, adminRole)
+        );
+        vm.prank(alice);
+        nft.setRenderer(fakeRenderer);
+    }
+
+    function test_setRenderer_setsAddress() public {
+        address fakeRenderer = makeAddr("renderer");
+        vm.prank(admin);
+        nft.setRenderer(fakeRenderer);
+        assertEq(address(nft.renderer()), fakeRenderer);
+    }
+
+    function test_tokenURI_withoutRenderer_returnsEmpty() public {
+        vm.prank(admin);
+        nft.safeMint(alice);
+        assertEq(nft.tokenURI(0), "");
+    }
+
+    function test_tokenURI_revertsForNonexistentToken() public {
+        vm.expectRevert();
+        nft.tokenURI(999);
+    }
+
+    function test_mintBlock_recordedOnMint() public {
+        vm.roll(42);
+        vm.prank(admin);
+        nft.safeMint(alice);
+        assertEq(nft.mintBlocks(0), 42);
+    }
+
+    function test_mintBlock_multipleTokens() public {
+        vm.roll(100);
+        vm.prank(admin);
+        nft.safeMint(alice);
+
+        vm.roll(200);
+        vm.prank(admin);
+        nft.safeMint(bob);
+
+        assertEq(nft.mintBlocks(0), 100);
+        assertEq(nft.mintBlocks(1), 200);
+    }
+
     // --- Access control ---
 
     function test_adminCanGrantMinterRole() public {
