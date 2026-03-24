@@ -7,12 +7,14 @@ import {OlympiaExecutor} from "../src/OlympiaExecutor.sol";
 import {ECFPRegistry} from "../src/ECFPRegistry.sol";
 import {SanctionsOracle} from "../src/SanctionsOracle.sol";
 import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
+import {OlympiaMemberRenderer} from "../src/nft/OlympiaMemberRenderer.sol";
+import {MembershipVerifier} from "../src/nft/MembershipVerifier.sol";
 import {ISanctionsOracle} from "../src/interfaces/ISanctionsOracle.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title PrecomputeAddresses
-/// @notice Computes deterministic addresses for the entire Olympia demo v0.2 deployment.
+/// @notice Computes deterministic addresses for the entire Olympia demo v0.3 deployment.
 /// @dev Resolves the Treasury ↔ Executor circular dependency:
 ///      - Treasury uses CREATE (nonce-based) - address independent of constructor args
 ///      - All governance contracts use CREATE2 (salt-based) via deterministic deployer factory
@@ -26,9 +28,9 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 ///      (deployer, nonce), breaking the cycle. Governance contracts use CREATE2 because their
 ///      constructor args point downward (to Treasury, not to each other).
 contract PrecomputeAddresses is Script {
-    // CREATE2 salt for demo v0.2
+    // CREATE2 salt for demo v0.3
     // Uses CREATE2_FACTORY from forge-std/Base.sol (0x4e59b44847b379578588920cA78FbF26c0B4956C)
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_2");
+    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_3");
 
     // Governance parameters (must match DeployGovernance.s.sol)
     uint256 constant TIMELOCK_DELAY = 3600; // 1 hour
@@ -43,12 +45,12 @@ contract PrecomputeAddresses is Script {
         uint256 nonce = vm.envUint("DEPLOYER_NONCE");
 
         console.log("========================================");
-        console.log("  Olympia Demo v0.2 - Address Precomputation");
+        console.log("  Olympia Demo v0.3 - Address Precomputation");
         console.log("========================================");
         console.log("");
         console.log("Deployer:", deployer);
         console.log("Nonce:   ", nonce);
-        console.log("Salt:     OLYMPIA_DEMO_V0_2");
+        console.log("Salt:     OLYMPIA_DEMO_V0_3");
         console.log("Factory: ", CREATE2_FACTORY);
         console.log("");
 
@@ -70,9 +72,21 @@ contract PrecomputeAddresses is Script {
             abi.encodePacked(type(OlympiaMemberNFT).creationCode, abi.encode(deployer))
         );
 
+        // OlympiaMemberRenderer() — no constructor args
+        address renderer = _computeCreate2(
+            abi.encodePacked(type(OlympiaMemberRenderer).creationCode)
+        );
+
+        // MembershipVerifier(deployer)
+        address verifier = _computeCreate2(
+            abi.encodePacked(type(MembershipVerifier).creationCode, abi.encode(deployer))
+        );
+
         console.log("--- Phase 2: Foundation (CREATE2) ---");
-        console.log("SanctionsOracle: ", sanctions);
-        console.log("OlympiaMemberNFT:", memberNFT);
+        console.log("SanctionsOracle:       ", sanctions);
+        console.log("OlympiaMemberNFT:      ", memberNFT);
+        console.log("OlympiaMemberRenderer: ", renderer);
+        console.log("MembershipVerifier:    ", verifier);
         console.log("");
 
         // ─── Phase 3: Governance (CREATE2) ──────────────────────────

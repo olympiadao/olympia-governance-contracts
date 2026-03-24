@@ -14,8 +14,8 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 /// @dev Uses CREATE2 for deterministic addresses. Resolves circular dependency between Timelock and Governor
 ///      by precomputing the Governor address before deploying the Timelock.
 contract DeployGovernance is Script {
-    // CREATE2 salt — Demo v0.2 (pre-Olympia Mordor testing)
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_2");
+    // CREATE2 salt — Demo v0.3 (on-chain SVG, verifier, one-per-address)
+    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_3");
 
     // Mordor testnet parameters
     uint256 constant TIMELOCK_DELAY = 3600; // 1 hour
@@ -25,9 +25,9 @@ contract DeployGovernance is Script {
     uint48 constant LATE_QUORUM_EXTENSION = 50; // ~11 minutes
     uint256 constant MIN_REVIEW_PERIOD = 300; // 5 minutes (demo testing)
 
-    // Treasury (demo v0.2, pure Solidity immutable executor)
-    // Set after deploying Treasury with PrecomputeAddresses.s.sol
-    address constant TREASURY = 0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf;
+    // Treasury (demo v0.3, pure Solidity immutable executor)
+    // Deployed via CREATE (nonce 0) from deployer 0xAF21767a2c5b3acFFB64dC64CD5A876e91155bD0
+    address constant TREASURY = 0x60d0A7394f9Cd5C469f9F5Ec4F9C803F5294d79b;
 
     function run() public {
         address deployer = msg.sender;
@@ -36,7 +36,7 @@ contract DeployGovernance is Script {
         address sanctionsOracle = vm.envAddress("SANCTIONS_ORACLE");
         address memberNFT = vm.envAddress("MEMBER_NFT");
 
-        console.log("=== Olympia Governance Deployment (Demo v0.2) ===");
+        console.log("=== Olympia Governance Deployment (Demo v0.3) ===");
         console.log("Deployer:", deployer);
         console.log("SanctionsOracle:", sanctionsOracle);
         console.log("MemberNFT:", memberNFT);
