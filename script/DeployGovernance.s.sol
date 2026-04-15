@@ -13,9 +13,10 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 /// @notice Deploys the governance pipeline: TimelockController, OlympiaGovernor, OlympiaExecutor, ECFPRegistry
 /// @dev Uses CREATE2 for deterministic addresses. Resolves circular dependency between Timelock and Governor
 ///      by precomputing the Governor address before deploying the Timelock.
+///      Demo v0.4: ECFPRegistry deployed with submission bond (1 ETC) and draft cap (3 per address).
 contract DeployGovernance is Script {
-    // CREATE2 salt — Demo v0.3 (on-chain SVG, verifier, one-per-address)
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_3");
+    // CREATE2 salt — Demo v0.4 (spam protection: submission bond + draft cap)
+    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_4");
 
     // Mordor testnet parameters
     uint256 constant TIMELOCK_DELAY = 3600; // 1 hour
@@ -25,7 +26,11 @@ contract DeployGovernance is Script {
     uint48 constant LATE_QUORUM_EXTENSION = 50; // ~11 minutes
     uint256 constant MIN_REVIEW_PERIOD = 300; // 5 minutes (demo testing)
 
-    // Treasury (demo v0.3, pure Solidity immutable executor)
+    // ECFPRegistry spam protection parameters (demo v0.4)
+    uint256 constant MAX_DRAFTS_PER_ADDRESS = 3; // immutable draft cap per proposer
+    uint256 constant SUBMISSION_BOND = 1 ether; // 1 ETC bond; adjustable post-deploy via setSubmissionBond()
+
+    // Treasury (demo v0.3 — re-used in demo v0.4, pure Solidity immutable executor)
     // Deployed via CREATE (nonce 0) from deployer 0xAF21767a2c5b3acFFB64dC64CD5A876e91155bD0
     address constant TREASURY = 0x60d0A7394f9Cd5C469f9F5Ec4F9C803F5294d79b;
 
@@ -36,7 +41,7 @@ contract DeployGovernance is Script {
         address sanctionsOracle = vm.envAddress("SANCTIONS_ORACLE");
         address memberNFT = vm.envAddress("MEMBER_NFT");
 
-        console.log("=== Olympia Governance Deployment (Demo v0.3) ===");
+        console.log("=== Olympia Governance Deployment (Demo v0.4) ===");
         console.log("Deployer:", deployer);
         console.log("SanctionsOracle:", sanctionsOracle);
         console.log("MemberNFT:", memberNFT);
@@ -74,9 +79,13 @@ contract DeployGovernance is Script {
         OlympiaExecutor executor = new OlympiaExecutor{salt: SALT}(TREASURY, address(timelock), sanctionsOracle);
         console.log("OlympiaExecutor:", address(executor));
 
-        // Step 5: Deploy ECFPRegistry
-        ECFPRegistry registry = new ECFPRegistry{salt: SALT}(deployer, MIN_REVIEW_PERIOD);
+        // Step 5: Deploy ECFPRegistry (demo v0.4: with submission bond and draft cap)
+        ECFPRegistry registry = new ECFPRegistry{salt: SALT}(
+            deployer, MIN_REVIEW_PERIOD, MAX_DRAFTS_PER_ADDRESS, SUBMISSION_BOND, TREASURY
+        );
         console.log("ECFPRegistry:", address(registry));
+        console.log("  submissionBond:", SUBMISSION_BOND / 1 ether, "ETC");
+        console.log("  maxDraftsPerAddress:", MAX_DRAFTS_PER_ADDRESS);
 
         vm.stopBroadcast();
 

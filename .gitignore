@@ -6,8 +6,9 @@ out/
 /broadcast/**/dry-run/
 /broadcast/*/31337/
 
-# Docs
+# Docs (forge doc output)
 docs/
+!docs/ATTRIBUTION.md
 
 # Secrets & credentials
 .env

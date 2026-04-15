@@ -17,9 +17,11 @@ contract ECFPRegistryTest is Test {
     uint256 public amount = 10 ether;
     bytes32 public metadataCID = keccak256("QmSomeIPFSHash");
     uint256 public constant MIN_REVIEW = 1 days;
+    // Regression fixtures: bond=0 (no ETH required), cap=max (no limit), non-zero treasury
+    address public treasuryAddr = makeAddr("treasury");
 
     function setUp() public {
-        registry = new ECFPRegistry(admin, MIN_REVIEW);
+        registry = new ECFPRegistry(admin, MIN_REVIEW, type(uint256).max, 0, treasuryAddr);
 
         // Grant GOVERNOR_ROLE to governor address
         vm.startPrank(admin);
@@ -217,7 +219,7 @@ contract ECFPRegistryTest is Test {
 
     function test_activateProposal_zeroReviewPeriod() public {
         vm.prank(admin);
-        ECFPRegistry zeroReview = new ECFPRegistry(admin, 0);
+        ECFPRegistry zeroReview = new ECFPRegistry(admin, 0, type(uint256).max, 0, treasuryAddr);
 
         vm.startPrank(admin);
         zeroReview.grantRole(zeroReview.GOVERNOR_ROLE(), governor);
