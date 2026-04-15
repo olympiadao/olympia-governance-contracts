@@ -46,14 +46,19 @@ contract PrecomputeAddresses is Script {
 
     function run() public view {
         address deployer = vm.envAddress("DEPLOYER");
-        uint256 nonce = vm.envUint("DEPLOYER_NONCE");
+
+        // NONCE MUST BE 0. Treasury deploys via CREATE: address = keccak256(rlp(deployer, nonce)).
+        // PrecomputeAddresses fixes nonce=0 so the treasury address is deterministic.
+        // The deployer wallet must be a FRESH address (never sent a tx on this chain)
+        // before running Deploy.s.sol in the treasury repo.
+        uint256 nonce = 0;
 
         console.log("========================================");
         console.log("  Olympia Demo v0.4 - Address Precomputation");
         console.log("========================================");
         console.log("");
         console.log("Deployer:", deployer);
-        console.log("Nonce:   ", nonce);
+        console.log("Nonce:    0 (FIXED -- deployer must be a fresh address)");
         console.log("Salt:     OLYMPIA_DEMO_V0_4");
         console.log("Factory: ", CREATE2_FACTORY);
         console.log("");
@@ -165,14 +170,19 @@ contract PrecomputeAddresses is Script {
         console.log("  Deployment Order");
         console.log("========================================");
         console.log("");
-        console.log("1. Deploy Treasury (CREATE, nonce %d):", nonce);
+        console.log("PREREQUISITE: deployer wallet must be a FRESH address (nonce=0 on target chain).");
+        console.log("  Treasury CREATE address = keccak256(rlp(deployer, 0)).");
+        console.log("  If nonce != 0, treasury lands at wrong address and executor is broken.");
+        console.log("");
+        console.log("1. Fill in EXECUTOR=%s in treasury/script/Deploy.s.sol", executor);
+        console.log("2. Deploy Treasury (CREATE, nonce=0):");
         console.log("   forge script Deploy.s.sol --broadcast --legacy");
-        console.log("2. Deploy Foundation (CREATE2):");
+        console.log("3. Deploy Foundation (CREATE2):");
         console.log("   forge script DeployFoundation.s.sol --broadcast --legacy");
-        console.log("3. Deploy Governance (CREATE2):");
+        console.log("4. Deploy Governance (CREATE2):");
         console.log("   forge script DeployGovernance.s.sol --broadcast --legacy");
-        console.log("4. Verify: treasury.executor() == %s", executor);
-        console.log("5. Verify: executor.treasury() == %s", treasury);
+        console.log("5. Verify: treasury.executor() == %s", executor);
+        console.log("6. Verify: executor.treasury() == %s", treasury);
     }
 
     /// @dev Compute CREATE2 address using the deterministic deployer factory
