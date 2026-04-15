@@ -14,7 +14,7 @@ import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title PrecomputeAddresses
-/// @notice Computes deterministic addresses for the entire Olympia demo v0.3 deployment.
+/// @notice Computes deterministic addresses for the entire Olympia demo v0.4 deployment.
 /// @dev Resolves the Treasury ↔ Executor circular dependency:
 ///      - Treasury uses CREATE (nonce-based) - address independent of constructor args
 ///      - All governance contracts use CREATE2 (salt-based) via deterministic deployer factory
@@ -28,29 +28,33 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 ///      (deployer, nonce), breaking the cycle. Governance contracts use CREATE2 because their
 ///      constructor args point downward (to Treasury, not to each other).
 contract PrecomputeAddresses is Script {
-    // CREATE2 salt for demo v0.3
+    // CREATE2 salt for demo v0.4 (must match DeployGovernance.s.sol)
     // Uses CREATE2_FACTORY from forge-std/Base.sol (0x4e59b44847b379578588920cA78FbF26c0B4956C)
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_3");
+    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_4");
 
-    // Governance parameters (must match DeployGovernance.s.sol)
+    // Governance parameters (must match DeployGovernance.s.sol exactly)
     uint256 constant TIMELOCK_DELAY = 3600; // 1 hour
     uint48 constant VOTING_DELAY = 1; // 1 block
     uint32 constant VOTING_PERIOD = 100; // ~22 minutes on ETC
     uint256 constant QUORUM_PERCENT = 10;
     uint48 constant LATE_QUORUM_EXTENSION = 50; // ~11 minutes
-    uint256 constant MIN_REVIEW_PERIOD = 86400; // 1 day
+    uint256 constant MIN_REVIEW_PERIOD = 300; // 5 minutes (demo testing)
+
+    // ECFPRegistry spam protection parameters (demo v0.4, must match DeployGovernance.s.sol)
+    uint256 constant MAX_DRAFTS_PER_ADDRESS = 3;
+    uint256 constant SUBMISSION_BOND = 1 ether;
 
     function run() public view {
         address deployer = vm.envAddress("DEPLOYER");
         uint256 nonce = vm.envUint("DEPLOYER_NONCE");
 
         console.log("========================================");
-        console.log("  Olympia Demo v0.3 - Address Precomputation");
+        console.log("  Olympia Demo v0.4 - Address Precomputation");
         console.log("========================================");
         console.log("");
         console.log("Deployer:", deployer);
         console.log("Nonce:   ", nonce);
-        console.log("Salt:     OLYMPIA_DEMO_V0_3");
+        console.log("Salt:     OLYMPIA_DEMO_V0_4");
         console.log("Factory: ", CREATE2_FACTORY);
         console.log("");
 
@@ -124,10 +128,12 @@ contract PrecomputeAddresses is Script {
             )
         );
 
-        // ECFPRegistry(admin, minReviewPeriod)
+        // ECFPRegistry(admin, minReviewPeriod, maxDraftsPerAddress, initialBond, treasury)
+        // demo_v0.4: treasury from Phase 1 (CREATE), bond=1 ETC, cap=3
         address registry = _computeCreate2(
             abi.encodePacked(
-                type(ECFPRegistry).creationCode, abi.encode(deployer, MIN_REVIEW_PERIOD)
+                type(ECFPRegistry).creationCode,
+                abi.encode(deployer, MIN_REVIEW_PERIOD, MAX_DRAFTS_PER_ADDRESS, SUBMISSION_BOND, treasury)
             )
         );
 
@@ -140,7 +146,7 @@ contract PrecomputeAddresses is Script {
 
         // ─── Deploy Script Constants ────────────────────────────────
         console.log("========================================");
-        console.log("  Constants for Deploy Scripts");
+        console.log("  Constants for Deploy Scripts (demo v0.4)");
         console.log("========================================");
         console.log("");
         console.log("Treasury repo - script/Deploy.s.sol:");
