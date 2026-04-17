@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
-import {OlympiaMemberRenderer} from "../src/nft/OlympiaMemberRenderer.sol";
+import {OlympiaDAOMemberNFT} from "../src/OlympiaDAOMemberNFT.sol";
+import {OlympiaDAOMemberRenderer} from "../src/nft/OlympiaDAOMemberRenderer.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 
 /// @title GenerateSamples
@@ -15,8 +15,8 @@ contract GenerateSamples is Script {
         // Deploy contracts locally
         address admin = address(0xAd1);
         vm.startPrank(admin);
-        OlympiaMemberNFT nft = new OlympiaMemberNFT(admin);
-        OlympiaMemberRenderer renderer = new OlympiaMemberRenderer();
+        OlympiaDAOMemberNFT nft = new OlympiaDAOMemberNFT("OlympiaDAO Member v0.4", "OLYMPIADAOv04", admin, 0, address(0));
+        OlympiaDAOMemberRenderer renderer = new OlympiaDAOMemberRenderer("OlympiaDAO Member v0.4");
         nft.setRenderer(address(renderer));
 
         // Mint 10 sample tokens to different addresses
@@ -93,7 +93,7 @@ contract GenerateSamples is Script {
             '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}'
             'img{width:100%;border-radius:12px;border:1px solid rgba(0,255,174,0.2)}'
             'h1{color:#00ffae}h2{color:#c3c5cb;font-size:14px}</style></head>'
-            '<body><h1>Olympia Member NFT v0.3 - Sample Gallery</h1><div class="grid">',
+            '<body><h1>OlympiaDAO Member NFT v0.4 - Sample Gallery</h1><div class="grid">',
             _galleryItems(),
             '</div></body></html>'
         ));

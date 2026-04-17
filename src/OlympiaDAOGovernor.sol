@@ -13,12 +13,16 @@ import {GovernorPreventLateQuorum} from "@openzeppelin/contracts/governance/exte
 import {GovernorStorage} from "@openzeppelin/contracts/governance/extensions/GovernorStorage.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
-import {ISanctionsOracle} from "./interfaces/ISanctionsOracle.sol";
 
-/// @title OlympiaGovernor
-/// @notice CoreDAO Governor with 3-layer sanctions defense (ECIP-1113, ECIP-1119)
-/// @dev Demo v0.2: GovernorVotes reads OlympiaMemberNFT directly. One soulbound NFT = one vote.
-contract OlympiaGovernor is
+/// @title OlympiaDAOGovernor
+/// @notice OlympiaDAO on-chain governor (ECIP-1113). Pure OpenZeppelin diamond composition — no custom logic.
+/// @dev Sanctions enforcement has been moved to the peripheral entry/exit gates:
+///      - Entry gate: ECFPRegistry.activateProposal() checks sanctions before calling Governor.propose()
+///      - Exit gate: OlympiaExecutor.executeTreasury() checks sanctions before releasing funds
+///      This contract is therefore auditable as pure unmodified OZ Governor code.
+///      One soulbound OlympiaDAOMemberNFT = one vote. Quorum auto-corrects as inactive members
+///      are permissionlessly revoked via OlympiaDAOMemberNFT.revokeIfInactive().
+contract OlympiaDAOGovernor is
     Governor,
     GovernorSettings,
     GovernorCountingSimple,
@@ -28,19 +32,16 @@ contract OlympiaGovernor is
     GovernorPreventLateQuorum,
     GovernorStorage
 {
-    ISanctionsOracle public sanctionsOracle;
-
-    event SanctionsOracleUpdated(address indexed oldOracle, address indexed newOracle);
-    event ProposalCancelledDueToSanctions(uint256 indexed proposalId, address indexed sanctionedAddr);
-
-    error SanctionedRecipient(address account);
-    error NoSanctionedRecipients(uint256 proposalId);
-    error SanctionsOracleZeroAddress();
-
+    /// @param name_               EIP712 domain name and governor display name
+    /// @param token_              OlympiaDAOMemberNFT (IVotes)
+    /// @param timelock_           TimelockController
+    /// @param votingDelay_        Blocks before voting opens after proposal
+    /// @param votingPeriod_       Blocks the voting window stays open
+    /// @param quorumPercent_      Quorum as percent of total supply (e.g. 10 = 10%)
+    /// @param lateQuorumExtension_ Extra blocks added if quorum is reached late
     constructor(
         string memory name_,
         IVotes token_,
-        ISanctionsOracle sanctionsOracle_,
         TimelockController timelock_,
         uint48 votingDelay_,
         uint32 votingPeriod_,
@@ -53,100 +54,11 @@ contract OlympiaGovernor is
         GovernorVotesQuorumFraction(quorumPercent_)
         GovernorTimelockControl(timelock_)
         GovernorPreventLateQuorum(lateQuorumExtension_)
-    {
-        sanctionsOracle = sanctionsOracle_;
-    }
+    {}
 
     // =========================================================================
-    // Layer 1: Early sanctions check at propose()
-    // =========================================================================
-
-    /// @notice Override propose to check recipients against SanctionsOracle
-    function propose(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description
-    ) public virtual override(Governor) returns (uint256) {
-        _checkSanctionedRecipients(targets, calldatas);
-        return super.propose(targets, values, calldatas, description);
-    }
-
-    // =========================================================================
-    // Layer 2: Permissionless cancel if recipient becomes sanctioned
-    // =========================================================================
-
-    /// @notice Cancel a proposal if any recipient is now sanctioned
-    /// @dev Callable by anyone — permissionless sanctions enforcement
-    function cancelIfSanctioned(uint256 proposalId) external {
-        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash) =
-            proposalDetails(proposalId);
-
-        address sanctioned = _findSanctionedRecipient(targets, calldatas);
-        if (sanctioned == address(0)) {
-            revert NoSanctionedRecipients(proposalId);
-        }
-
-        emit ProposalCancelledDueToSanctions(proposalId, sanctioned);
-        _cancel(targets, values, calldatas, descriptionHash);
-    }
-
-    // =========================================================================
-    // OIP self-upgrade: sanctions oracle
-    // =========================================================================
-
-    /// @notice Update the sanctions oracle via governance proposal
-    function updateSanctionsOracle(ISanctionsOracle newOracle) external onlyGovernance {
-        if (address(newOracle) == address(0)) revert SanctionsOracleZeroAddress();
-        address oldOracle = address(sanctionsOracle);
-        sanctionsOracle = newOracle;
-        emit SanctionsOracleUpdated(oldOracle, address(newOracle));
-    }
-
-    // =========================================================================
-    // Internal helpers
-    // =========================================================================
-
-    /// @dev Revert if any target or calldata recipient is sanctioned
-    function _checkSanctionedRecipients(address[] memory targets, bytes[] memory calldatas) internal view {
-        address sanctioned = _findSanctionedRecipient(targets, calldatas);
-        if (sanctioned != address(0)) {
-            revert SanctionedRecipient(sanctioned);
-        }
-    }
-
-    /// @dev Scan targets and calldatas for sanctioned addresses. Returns address(0) if none found.
-    function _findSanctionedRecipient(address[] memory targets, bytes[] memory calldatas)
-        internal
-        view
-        returns (address)
-    {
-        for (uint256 i = 0; i < targets.length; i++) {
-            // Check the target address itself
-            if (sanctionsOracle.isSanctioned(targets[i])) {
-                return targets[i];
-            }
-            // Decode recipient from calldata if it looks like executeTreasury(address,uint256)
-            if (calldatas[i].length >= 36) {
-                bytes4 selector;
-                address recipient;
-                assembly {
-                    let data := mload(add(calldatas, mul(add(i, 1), 0x20)))
-                    selector := mload(add(data, 0x20))
-                    recipient := mload(add(data, 0x24))
-                }
-                // Clean upper bits
-                recipient = address(uint160(recipient));
-                if (recipient != address(0) && sanctionsOracle.isSanctioned(recipient)) {
-                    return recipient;
-                }
-            }
-        }
-        return address(0);
-    }
-
-    // =========================================================================
-    // Diamond inheritance overrides (pass-throughs to super)
+    // Diamond inheritance overrides (pure super-call pass-throughs)
+    // Required by Solidity multi-inheritance — no custom logic.
     // =========================================================================
 
     function state(uint256 proposalId) public view override(Governor, GovernorTimelockControl) returns (ProposalState) {

@@ -2,18 +2,26 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {OlympiaMemberRenderer} from "../../src/nft/OlympiaMemberRenderer.sol";
-import {OlympiaMemberNFT} from "../../src/OlympiaMemberNFT.sol";
+import {OlympiaDAOMemberRenderer} from "../../src/nft/OlympiaDAOMemberRenderer.sol";
+import {OlympiaDAOMemberNFT} from "../../src/OlympiaDAOMemberNFT.sol";
 
-contract OlympiaMemberRendererTest is Test {
-    OlympiaMemberRenderer public renderer;
-    OlympiaMemberNFT public nft;
+contract OlympiaDAOMemberRendererTest is Test {
+    OlympiaDAOMemberRenderer public renderer;
+    OlympiaDAOMemberNFT public nft;
     address public admin = makeAddr("admin");
     address public alice = makeAddr("alice");
 
+    string constant DISPLAY_NAME = "OlympiaDAO Member v0.4";
+
     function setUp() public {
-        renderer = new OlympiaMemberRenderer();
-        nft = new OlympiaMemberNFT(admin);
+        renderer = new OlympiaDAOMemberRenderer(DISPLAY_NAME);
+        nft = new OlympiaDAOMemberNFT(
+            DISPLAY_NAME,
+            "OLYMPIADAOv04",
+            admin,
+            0,           // inactivityThreshold disabled
+            address(0)   // governor not needed for renderer tests
+        );
         vm.prank(admin);
         nft.setRenderer(address(renderer));
     }
@@ -21,68 +29,85 @@ contract OlympiaMemberRendererTest is Test {
     // --- Standalone renderer tests ---
 
     function test_tokenURI_returnsDataUri() public view {
-        string memory uri = renderer.tokenURI(0, alice, 100);
+        string memory uri = renderer.tokenURI(0, alice, 100, 100);
         assertTrue(_startsWith(uri, "data:application/json;base64,"));
     }
 
     function test_tokenURI_deterministicOutput() public view {
-        string memory uri1 = renderer.tokenURI(7, alice, 100);
-        string memory uri2 = renderer.tokenURI(7, alice, 100);
+        string memory uri1 = renderer.tokenURI(7, alice, 100, 50);
+        string memory uri2 = renderer.tokenURI(7, alice, 100, 50);
         assertEq(keccak256(bytes(uri1)), keccak256(bytes(uri2)));
     }
 
     function test_tokenURI_differentTokenIds_differentOutput() public view {
-        string memory uri1 = renderer.tokenURI(0, alice, 100);
-        string memory uri2 = renderer.tokenURI(1, alice, 100);
+        string memory uri1 = renderer.tokenURI(0, alice, 100, 50);
+        string memory uri2 = renderer.tokenURI(1, alice, 100, 50);
+        assertTrue(keccak256(bytes(uri1)) != keccak256(bytes(uri2)));
+    }
+
+    function test_tokenURI_differentLastActivityBlocks_differentOutput() public view {
+        string memory uri1 = renderer.tokenURI(0, alice, 100, 50);
+        string memory uri2 = renderer.tokenURI(0, alice, 100, 99);
         assertTrue(keccak256(bytes(uri1)) != keccak256(bytes(uri2)));
     }
 
     function test_tokenURI_containsName() public view {
-        string memory uri = renderer.tokenURI(7, alice, 100);
+        string memory uri = renderer.tokenURI(7, alice, 100, 50);
         string memory decoded = _decodeDataUri(uri);
-        assertTrue(_contains(decoded, "Olympia v0.3 Contributor #7"));
+        assertTrue(_contains(decoded, "OlympiaDAO Member v0.4 Contributor #7"));
     }
 
     function test_tokenURI_containsDescription() public view {
-        string memory uri = renderer.tokenURI(0, alice, 100);
+        string memory uri = renderer.tokenURI(0, alice, 100, 50);
         string memory decoded = _decodeDataUri(uri);
         assertTrue(_contains(decoded, "Soulbound governance NFT"));
     }
 
     function test_tokenURI_containsImageField() public view {
-        string memory uri = renderer.tokenURI(0, alice, 100);
+        string memory uri = renderer.tokenURI(0, alice, 100, 50);
         string memory decoded = _decodeDataUri(uri);
         assertTrue(_contains(decoded, '"image":"data:image/svg+xml;base64,'));
     }
 
     function test_tokenURI_containsAttributes() public view {
-        string memory uri = renderer.tokenURI(42, alice, 5000);
+        string memory uri = renderer.tokenURI(42, alice, 5000, 1234);
         string memory decoded = _decodeDataUri(uri);
         assertTrue(_contains(decoded, '"Contributor Number"'));
         assertTrue(_contains(decoded, '"Chain"'));
         assertTrue(_contains(decoded, '"Mint Block"'));
-        assertTrue(_contains(decoded, '"Active"'));
+        assertTrue(_contains(decoded, '"Last Active Block"'));
     }
 
-    function test_tokenURI_chainName_mordor() public view {
-        // Default foundry chainid is 31337, so chain will be "Unknown Chain"
-        string memory uri = renderer.tokenURI(0, alice, 100);
+    function test_tokenURI_doesNotContainHardcodedActive() public view {
+        // Old renderer had hardcoded "Status":"Active" — new one should not
+        string memory uri = renderer.tokenURI(0, alice, 100, 50);
+        string memory decoded = _decodeDataUri(uri);
+        assertFalse(_contains(decoded, '"Active"'));
+    }
+
+    function test_tokenURI_chainName_unknown() public view {
+        // Default foundry chainid is 31337
+        string memory uri = renderer.tokenURI(0, alice, 100, 50);
         string memory decoded = _decodeDataUri(uri);
         assertTrue(_contains(decoded, "Unknown Chain"));
     }
 
-    function test_tokenURI_chainName_mordorFork() public {
+    function test_tokenURI_chainName_mordor() public {
         vm.chainId(63);
-        string memory uri = renderer.tokenURI(0, alice, 100);
+        string memory uri = renderer.tokenURI(0, alice, 100, 50);
         string memory decoded = _decodeDataUri(uri);
         assertTrue(_contains(decoded, "Mordor Testnet"));
     }
 
     function test_tokenURI_chainName_etc() public {
         vm.chainId(61);
-        string memory uri = renderer.tokenURI(0, alice, 100);
+        string memory uri = renderer.tokenURI(0, alice, 100, 50);
         string memory decoded = _decodeDataUri(uri);
         assertTrue(_contains(decoded, "Ethereum Classic"));
+    }
+
+    function test_nftDisplayName_storedCorrectly() public view {
+        assertEq(renderer.nftDisplayName(), DISPLAY_NAME);
     }
 
     // --- Integration with NFT ---
@@ -95,7 +120,7 @@ contract OlympiaMemberRendererTest is Test {
         string memory uri = nft.tokenURI(0);
         assertTrue(_startsWith(uri, "data:application/json;base64,"));
         string memory decoded = _decodeDataUri(uri);
-        assertTrue(_contains(decoded, "Olympia v0.3 Contributor #0"));
+        assertTrue(_contains(decoded, "OlympiaDAO Member v0.4 Contributor #0"));
     }
 
     function test_fullPipeline_multipleTokens() public {
@@ -129,12 +154,12 @@ contract OlympiaMemberRendererTest is Test {
 
         string memory uri1 = nft.tokenURI(0);
 
-        // Deploy new renderer and switch
-        OlympiaMemberRenderer newRenderer = new OlympiaMemberRenderer();
+        // Deploy new renderer with same display name and switch
+        OlympiaDAOMemberRenderer newRenderer = new OlympiaDAOMemberRenderer(DISPLAY_NAME);
         vm.prank(admin);
         nft.setRenderer(address(newRenderer));
 
-        // Same renderer code produces same output
+        // Same renderer code + same display name produces same output
         string memory uri2 = nft.tokenURI(0);
         assertEq(keccak256(bytes(uri1)), keccak256(bytes(uri2)));
     }

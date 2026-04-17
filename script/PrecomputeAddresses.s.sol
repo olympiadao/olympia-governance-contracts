@@ -2,25 +2,24 @@
 pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {OlympiaGovernor} from "../src/OlympiaGovernor.sol";
+import {OlympiaDAOGovernor} from "../src/OlympiaDAOGovernor.sol";
 import {OlympiaExecutor} from "../src/OlympiaExecutor.sol";
 import {ECFPRegistry} from "../src/ECFPRegistry.sol";
 import {SanctionsOracle} from "../src/SanctionsOracle.sol";
-import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
-import {OlympiaMemberRenderer} from "../src/nft/OlympiaMemberRenderer.sol";
+import {OlympiaDAOMemberNFT} from "../src/OlympiaDAOMemberNFT.sol";
+import {OlympiaDAOMemberRenderer} from "../src/nft/OlympiaDAOMemberRenderer.sol";
 import {MembershipVerifier} from "../src/nft/MembershipVerifier.sol";
-import {ISanctionsOracle} from "../src/interfaces/ISanctionsOracle.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title PrecomputeAddresses
-/// @notice Computes deterministic addresses for the entire Olympia demo v0.4 deployment.
+/// @notice Computes deterministic addresses for the entire OlympiaDAO demo v0.4 deployment.
 /// @dev Resolves the Treasury ↔ Executor circular dependency:
-///      - Treasury uses CREATE (nonce-based) - address independent of constructor args
+///      - Treasury uses CREATE (nonce-based) — address independent of constructor args
 ///      - All governance contracts use CREATE2 (salt-based) via deterministic deployer factory
 ///
 ///      Run off-chain only: `forge script script/PrecomputeAddresses.s.sol`
-///      Set env vars: DEPLOYER (address), DEPLOYER_NONCE (uint - current nonce on target chain)
+///      Set env vars: DEPLOYER (address)
 ///
 ///      Why CREATE for Treasury? Both Treasury and Executor have immutable constructor args
 ///      pointing to each other. CREATE2 addresses depend on constructor args (part of initcode),
@@ -28,19 +27,21 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 ///      (deployer, nonce), breaking the cycle. Governance contracts use CREATE2 because their
 ///      constructor args point downward (to Treasury, not to each other).
 contract PrecomputeAddresses is Script {
-    // CREATE2 salt for demo v0.4 (must match DeployGovernance.s.sol)
-    // Uses CREATE2_FACTORY from forge-std/Base.sol (0x4e59b44847b379578588920cA78FbF26c0B4956C)
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_4");
+    // ── Version (must match DeployFoundation.s.sol and DeployGovernance.s.sol) ──
+    string  constant NFT_NAME   = "OlympiaDAO Member v0.4";
+    string  constant GOV_NAME   = "OlympiaDAO Governor v0.4";
+    bytes32 constant SALT       = keccak256("OLYMPIA_DEMO_V0_4");
+    // ─────────────────────────────────────────────────────────────────────────────
 
     // Governance parameters (must match DeployGovernance.s.sol exactly)
-    uint256 constant TIMELOCK_DELAY = 3600; // 1 hour
-    uint48 constant VOTING_DELAY = 1; // 1 block
-    uint32 constant VOTING_PERIOD = 100; // ~22 minutes on ETC
+    uint256 constant TIMELOCK_DELAY = 3600;
+    uint48 constant VOTING_DELAY = 1;
+    uint32 constant VOTING_PERIOD = 100;
     uint256 constant QUORUM_PERCENT = 10;
-    uint48 constant LATE_QUORUM_EXTENSION = 50; // ~11 minutes
-    uint256 constant MIN_REVIEW_PERIOD = 300; // 5 minutes (demo testing)
+    uint48 constant LATE_QUORUM_EXTENSION = 50;
+    uint256 constant MIN_REVIEW_PERIOD = 300;
 
-    // ECFPRegistry spam protection parameters (demo v0.4, must match DeployGovernance.s.sol)
+    // ECFPRegistry spam protection parameters (must match DeployGovernance.s.sol)
     uint256 constant MAX_DRAFTS_PER_ADDRESS = 3;
     uint256 constant SUBMISSION_BOND = 1 ether;
 
@@ -48,13 +49,12 @@ contract PrecomputeAddresses is Script {
         address deployer = vm.envAddress("DEPLOYER");
 
         // NONCE MUST BE 0. Treasury deploys via CREATE: address = keccak256(rlp(deployer, nonce)).
-        // PrecomputeAddresses fixes nonce=0 so the treasury address is deterministic.
         // The deployer wallet must be a FRESH address (never sent a tx on this chain)
         // before running Deploy.s.sol in the treasury repo.
         uint256 nonce = 0;
 
         console.log("========================================");
-        console.log("  Olympia Demo v0.4 - Address Precomputation");
+        console.log("  OlympiaDAO Demo v0.4 - Address Precomputation");
         console.log("========================================");
         console.log("");
         console.log("Deployer:", deployer);
@@ -64,8 +64,6 @@ contract PrecomputeAddresses is Script {
         console.log("");
 
         // ─── Phase 1: Treasury (CREATE) ─────────────────────────────
-        // Treasury uses CREATE to break the circular dependency with Executor.
-        // CREATE address = f(deployer, nonce) - no dependency on constructor args.
         address treasury = vm.computeCreateAddress(deployer, nonce);
 
         console.log("--- Phase 1: Treasury (CREATE, nonce %d) ---", nonce);
@@ -73,17 +71,21 @@ contract PrecomputeAddresses is Script {
         console.log("");
 
         // ─── Phase 2: Foundation (CREATE2) ──────────────────────────
-        // SanctionsOracle(deployer) and OlympiaMemberNFT(deployer)
         address sanctions = _computeCreate2(
             abi.encodePacked(type(SanctionsOracle).creationCode, abi.encode(deployer))
         );
+
+        // OlympiaDAOMemberNFT(name_, symbol_, admin, inactivityThreshold_, governor_)
         address memberNFT = _computeCreate2(
-            abi.encodePacked(type(OlympiaMemberNFT).creationCode, abi.encode(deployer))
+            abi.encodePacked(
+                type(OlympiaDAOMemberNFT).creationCode,
+                abi.encode(NFT_NAME, "OLYMPIADAOv04", deployer, uint256(0), address(0))
+            )
         );
 
-        // OlympiaMemberRenderer() — no constructor args
+        // OlympiaDAOMemberRenderer(nftDisplayName_)
         address renderer = _computeCreate2(
-            abi.encodePacked(type(OlympiaMemberRenderer).creationCode)
+            abi.encodePacked(type(OlympiaDAOMemberRenderer).creationCode, abi.encode(NFT_NAME))
         );
 
         // MembershipVerifier(deployer)
@@ -92,10 +94,10 @@ contract PrecomputeAddresses is Script {
         );
 
         console.log("--- Phase 2: Foundation (CREATE2) ---");
-        console.log("SanctionsOracle:       ", sanctions);
-        console.log("OlympiaMemberNFT:      ", memberNFT);
-        console.log("OlympiaMemberRenderer: ", renderer);
-        console.log("MembershipVerifier:    ", verifier);
+        console.log("SanctionsOracle:          ", sanctions);
+        console.log("OlympiaDAOMemberNFT:      ", memberNFT);
+        console.log("OlympiaDAOMemberRenderer: ", renderer);
+        console.log("MembershipVerifier:       ", verifier);
         console.log("");
 
         // ─── Phase 3: Governance (CREATE2) ──────────────────────────
@@ -108,14 +110,14 @@ contract PrecomputeAddresses is Script {
             )
         );
 
-        // OlympiaGovernor(name, votes, sanctions, timelock, params...)
+        // OlympiaDAOGovernor(name_, token_, timelock_, votingDelay_, votingPeriod_, quorumPercent_, lateQuorumExtension_)
+        // Note: no sanctionsOracle_ — sanctions moved to ECFPRegistry and OlympiaExecutor
         address governor = _computeCreate2(
             abi.encodePacked(
-                type(OlympiaGovernor).creationCode,
+                type(OlympiaDAOGovernor).creationCode,
                 abi.encode(
-                    "OlympiaGovernor",
+                    GOV_NAME,
                     IVotes(memberNFT),
-                    ISanctionsOracle(sanctions),
                     TimelockController(payable(timelock)),
                     VOTING_DELAY,
                     VOTING_PERIOD,
@@ -126,27 +128,25 @@ contract PrecomputeAddresses is Script {
         );
 
         // OlympiaExecutor(treasury, timelock, sanctionsOracle)
-        // Uses Treasury address from Phase 1 (CREATE) - circular dependency resolved
         address executor = _computeCreate2(
             abi.encodePacked(
                 type(OlympiaExecutor).creationCode, abi.encode(treasury, timelock, sanctions)
             )
         );
 
-        // ECFPRegistry(admin, minReviewPeriod, maxDraftsPerAddress, initialBond, treasury)
-        // demo_v0.4: treasury from Phase 1 (CREATE), bond=1 ETC, cap=3
+        // ECFPRegistry(admin, minReviewPeriod, maxDraftsPerAddress, initialBond, treasury, sanctionsOracle_)
         address registry = _computeCreate2(
             abi.encodePacked(
                 type(ECFPRegistry).creationCode,
-                abi.encode(deployer, MIN_REVIEW_PERIOD, MAX_DRAFTS_PER_ADDRESS, SUBMISSION_BOND, treasury)
+                abi.encode(deployer, MIN_REVIEW_PERIOD, MAX_DRAFTS_PER_ADDRESS, SUBMISSION_BOND, treasury, sanctions)
             )
         );
 
         console.log("--- Phase 3: Governance (CREATE2) ---");
-        console.log("TimelockController:", timelock);
-        console.log("OlympiaGovernor:   ", governor);
-        console.log("OlympiaExecutor:   ", executor);
-        console.log("ECFPRegistry:      ", registry);
+        console.log("TimelockController:    ", timelock);
+        console.log("OlympiaDAOGovernor:    ", governor);
+        console.log("OlympiaExecutor:       ", executor);
+        console.log("ECFPRegistry:          ", registry);
         console.log("");
 
         // ─── Deploy Script Constants ────────────────────────────────
@@ -158,9 +158,6 @@ contract PrecomputeAddresses is Script {
         console.log("  address constant EXECUTOR =", executor);
         console.log("  Deploy with CREATE (no salt). Nonce MUST be %d.", nonce);
         console.log("");
-        console.log("Governance repo - script/DeployFoundation.s.sol:");
-        console.log("  (no changes - uses deployer address from env)");
-        console.log("");
         console.log("Governance repo - script/DeployGovernance.s.sol:");
         console.log("  address constant TREASURY =", treasury);
         console.log("");
@@ -171,16 +168,12 @@ contract PrecomputeAddresses is Script {
         console.log("========================================");
         console.log("");
         console.log("PREREQUISITE: deployer wallet must be a FRESH address (nonce=0 on target chain).");
-        console.log("  Treasury CREATE address = keccak256(rlp(deployer, 0)).");
-        console.log("  If nonce != 0, treasury lands at wrong address and executor is broken.");
         console.log("");
         console.log("1. Fill in EXECUTOR=%s in treasury/script/Deploy.s.sol", executor);
-        console.log("2. Deploy Treasury (CREATE, nonce=0):");
-        console.log("   forge script Deploy.s.sol --broadcast --legacy");
-        console.log("3. Deploy Foundation (CREATE2):");
-        console.log("   forge script DeployFoundation.s.sol --broadcast --legacy");
-        console.log("4. Deploy Governance (CREATE2):");
-        console.log("   forge script DeployGovernance.s.sol --broadcast --legacy");
+        console.log("2. Deploy Treasury (CREATE, nonce=0)");
+        console.log("3. Deploy Foundation (CREATE2): forge script DeployFoundation.s.sol --broadcast --legacy");
+        console.log("4. Deploy Governance (CREATE2): forge script DeployGovernance.s.sol --broadcast --legacy");
+        console.log("   (DeployGovernance will automatically call memberNFT.setGovernor(governor))");
         console.log("5. Verify: treasury.executor() == %s", executor);
         console.log("6. Verify: executor.treasury() == %s", treasury);
     }

@@ -26,7 +26,7 @@ contract RedeployECFPRegistry is Script {
 
         // demo_v0.4 constructor: (admin, minReviewPeriod, maxDraftsPerAddress, initialBond, treasury)
         // Legacy deploy: no bond (0), no cap (max), treasury for interface compat
-        ECFPRegistry registry = new ECFPRegistry{salt: SALT}(deployer, MIN_REVIEW_PERIOD, type(uint256).max, 0, TREASURY);
+        ECFPRegistry registry = new ECFPRegistry{salt: SALT}(deployer, MIN_REVIEW_PERIOD, type(uint256).max, 0, TREASURY, address(0));
         console.log("ECFPRegistry (new):", address(registry));
 
         vm.stopBroadcast();

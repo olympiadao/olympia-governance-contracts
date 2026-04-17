@@ -39,7 +39,7 @@ contract ECFPRegistrySpamTest is Test {
         treasury = payable(makeAddr("treasury"));
         vm.deal(treasury, 0);
 
-        registry = new ECFPRegistry(admin, MIN_REVIEW, MAX_DRAFTS, BOND, treasury);
+        registry = new ECFPRegistry(admin, MIN_REVIEW, MAX_DRAFTS, BOND, treasury, address(0));
 
         vm.startPrank(admin);
         registry.grantRole(registry.GOVERNOR_ROLE(), governor);
@@ -434,12 +434,12 @@ contract ECFPRegistrySpamTest is Test {
 
     function test_constructor_zeroTreasury_reverts() public {
         vm.expectRevert(ECFPRegistry.ZeroTreasury.selector);
-        new ECFPRegistry(admin, MIN_REVIEW, MAX_DRAFTS, BOND, address(0));
+        new ECFPRegistry(admin, MIN_REVIEW, MAX_DRAFTS, BOND, address(0), address(0));
     }
 
     function test_constructor_zeroMaxDrafts_reverts() public {
         vm.expectRevert(ECFPRegistry.ZeroMaxDrafts.selector);
-        new ECFPRegistry(admin, MIN_REVIEW, 0, BOND, treasury);
+        new ECFPRegistry(admin, MIN_REVIEW, 0, BOND, treasury, address(0));
     }
 
     function test_constructor_parameters_stored() public view {
@@ -456,7 +456,7 @@ contract ECFPRegistrySpamTest is Test {
     function test_regression_fullLifecycle_noBond() public {
         // Simulate a testnet deployment with bond=0 — ensure all lifecycle transitions work
         ECFPRegistry noFeeRegistry =
-            new ECFPRegistry(admin, MIN_REVIEW, MAX_DRAFTS, 0, treasury);
+            new ECFPRegistry(admin, MIN_REVIEW, MAX_DRAFTS, 0, treasury, address(0));
 
         vm.startPrank(admin);
         noFeeRegistry.grantRole(noFeeRegistry.GOVERNOR_ROLE(), governor);

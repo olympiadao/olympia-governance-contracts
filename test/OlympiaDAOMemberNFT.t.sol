@@ -2,22 +2,28 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
+import {OlympiaDAOMemberNFT} from "../src/OlympiaDAOMemberNFT.sol";
 import {MembershipVerifier} from "../src/nft/MembershipVerifier.sol";
 import {IERC5192} from "../src/interfaces/IERC5192.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 
-contract OlympiaMemberNFTTest is Test {
-    OlympiaMemberNFT public nft;
+contract OlympiaDAOMemberNFTTest is Test {
+    OlympiaDAOMemberNFT public nft;
     address public admin = makeAddr("admin");
     address public minter = makeAddr("minter");
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
 
     function setUp() public {
-        nft = new OlympiaMemberNFT(admin);
+        nft = new OlympiaDAOMemberNFT(
+            "OlympiaDAO Member v0.4",
+            "OLYMPIADAOv04",
+            admin,
+            0,           // inactivityThreshold disabled
+            address(0)   // governor (not needed for these tests)
+        );
     }
 
     // --- Minting ---
@@ -68,7 +74,7 @@ contract OlympiaMemberNFTTest is Test {
     function test_safeMint_revertsIfAlreadyMember() public {
         vm.startPrank(admin);
         nft.safeMint(alice);
-        vm.expectRevert(abi.encodeWithSelector(OlympiaMemberNFT.AlreadyMember.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(OlympiaDAOMemberNFT.AlreadyMember.selector, alice));
         nft.safeMint(alice);
         vm.stopPrank();
     }
@@ -100,7 +106,7 @@ contract OlympiaMemberNFTTest is Test {
         nft.safeMint(alice);
 
         vm.prank(alice);
-        vm.expectRevert(OlympiaMemberNFT.SoulboundTransferBlocked.selector);
+        vm.expectRevert(OlympiaDAOMemberNFT.SoulboundTransferBlocked.selector);
         nft.transferFrom(alice, bob, 0);
     }
 
@@ -109,7 +115,7 @@ contract OlympiaMemberNFTTest is Test {
         nft.safeMint(alice);
 
         vm.prank(alice);
-        vm.expectRevert(OlympiaMemberNFT.SoulboundTransferBlocked.selector);
+        vm.expectRevert(OlympiaDAOMemberNFT.SoulboundTransferBlocked.selector);
         nft.safeTransferFrom(alice, bob, 0);
     }
 
@@ -129,14 +135,11 @@ contract OlympiaMemberNFTTest is Test {
     // --- getPastVotes (snapshot) ---
 
     function test_getPastVotes_snapshotCorrectness() public {
-        // Set explicit block to avoid via_ir block advancement ambiguity
         vm.roll(100);
         vm.prank(admin);
         nft.safeMint(alice);
 
-        // Advance well past mint block — getPastVotes requires strictly past blocks
         vm.roll(200);
-
         assertEq(nft.getPastVotes(alice, 100), 1);
     }
 
@@ -330,7 +333,6 @@ contract OlympiaMemberNFTTest is Test {
     }
 
     function test_safeMint_succeedsWithoutVerifier() public {
-        // No verifier set — should work as before (backward compat)
         vm.prank(admin);
         nft.safeMint(alice);
         assertEq(nft.ownerOf(0), alice);
@@ -341,8 +343,7 @@ contract OlympiaMemberNFTTest is Test {
         vm.prank(admin);
         nft.setVerifier(address(verifier));
 
-        // Alice is not verified — mint should revert
-        vm.expectRevert(abi.encodeWithSelector(OlympiaMemberNFT.NotVerified.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(OlympiaDAOMemberNFT.NotVerified.selector, alice));
         vm.prank(admin);
         nft.safeMint(alice);
     }

@@ -2,21 +2,25 @@
 pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {OlympiaGovernor} from "../src/OlympiaGovernor.sol";
+import {OlympiaDAOGovernor} from "../src/OlympiaDAOGovernor.sol";
+import {OlympiaDAOMemberNFT} from "../src/OlympiaDAOMemberNFT.sol";
 import {OlympiaExecutor} from "../src/OlympiaExecutor.sol";
 import {ECFPRegistry} from "../src/ECFPRegistry.sol";
-import {ISanctionsOracle} from "../src/interfaces/ISanctionsOracle.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title DeployGovernance
-/// @notice Deploys the governance pipeline: TimelockController, OlympiaGovernor, OlympiaExecutor, ECFPRegistry
-/// @dev Uses CREATE2 for deterministic addresses. Resolves circular dependency between Timelock and Governor
-///      by precomputing the Governor address before deploying the Timelock.
-///      Demo v0.4: ECFPRegistry deployed with submission bond (1 ETC) and draft cap (3 per address).
+/// @notice Deploys the governance pipeline: TimelockController, OlympiaDAOGovernor, OlympiaExecutor, ECFPRegistry
+/// @dev Uses CREATE2 for deterministic addresses. Run after DeployFoundation.
+///      Sanctions logic has been moved out of OlympiaDAOGovernor into ECFPRegistry (entry gate)
+///      and OlympiaExecutor (exit gate). OlympiaDAOGovernor is pure OZ diamond boilerplate.
 contract DeployGovernance is Script {
-    // CREATE2 salt — Demo v0.4 (spam protection: submission bond + draft cap)
-    bytes32 constant SALT = keccak256("OLYMPIA_DEMO_V0_4");
+    // ── Version (update these 4 lines when cutting a new demo) ──────────────
+    string  constant NFT_NAME   = "OlympiaDAO Member v0.4";
+    string  constant NFT_SYMBOL = "OLYMPIADAOv04";
+    string  constant GOV_NAME   = "OlympiaDAO Governor v0.4";
+    bytes32 constant SALT       = keccak256("OLYMPIA_DEMO_V0_4");
+    // ────────────────────────────────────────────────────────────────────────
 
     // Mordor testnet parameters
     uint256 constant TIMELOCK_DELAY = 3600; // 1 hour
@@ -41,8 +45,9 @@ contract DeployGovernance is Script {
         address sanctionsOracle = vm.envAddress("SANCTIONS_ORACLE");
         address memberNFT = vm.envAddress("MEMBER_NFT");
 
-        console.log("=== Olympia Governance Deployment (Demo v0.4) ===");
+        console.log("=== OlympiaDAO Governance Deployment (Demo v0.4) ===");
         console.log("Deployer:", deployer);
+        console.log("Governor name:", GOV_NAME);
         console.log("SanctionsOracle:", sanctionsOracle);
         console.log("MemberNFT:", memberNFT);
         console.log("Treasury:", TREASURY);
@@ -51,41 +56,48 @@ contract DeployGovernance is Script {
         vm.startBroadcast();
 
         // Step 1: Deploy TimelockController
-        // Governor will be granted roles after deployment
         address[] memory proposers = new address[](0);
         address[] memory executors = new address[](0);
         TimelockController timelock = new TimelockController{salt: SALT}(TIMELOCK_DELAY, proposers, executors, deployer);
         console.log("TimelockController:", address(timelock));
 
-        // Step 2: Deploy OlympiaGovernor
-        OlympiaGovernor governor = new OlympiaGovernor{salt: SALT}(
-            "OlympiaGovernor",
+        // Step 2: Deploy OlympiaDAOGovernor (pure OZ — no sanctions logic)
+        OlympiaDAOGovernor governor = new OlympiaDAOGovernor{salt: SALT}(
+            GOV_NAME,
             IVotes(memberNFT),
-            ISanctionsOracle(sanctionsOracle),
             timelock,
             VOTING_DELAY,
             VOTING_PERIOD,
             QUORUM_PERCENT,
             LATE_QUORUM_EXTENSION
         );
-        console.log("OlympiaGovernor:", address(governor));
+        console.log("OlympiaDAOGovernor:", address(governor));
 
         // Step 3: Grant timelock roles to Governor
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(governor));
         timelock.grantRole(timelock.CANCELLER_ROLE(), address(governor));
 
-        // Step 4: Deploy OlympiaExecutor
+        // Step 4: Deploy OlympiaExecutor (exit gate: checks sanctions before releasing funds)
         OlympiaExecutor executor = new OlympiaExecutor{salt: SALT}(TREASURY, address(timelock), sanctionsOracle);
         console.log("OlympiaExecutor:", address(executor));
 
-        // Step 5: Deploy ECFPRegistry (demo v0.4: with submission bond and draft cap)
+        // Step 5: Deploy ECFPRegistry (entry gate: checks sanctions before calling Governor.propose())
         ECFPRegistry registry = new ECFPRegistry{salt: SALT}(
-            deployer, MIN_REVIEW_PERIOD, MAX_DRAFTS_PER_ADDRESS, SUBMISSION_BOND, TREASURY
+            deployer,
+            MIN_REVIEW_PERIOD,
+            MAX_DRAFTS_PER_ADDRESS,
+            SUBMISSION_BOND,
+            TREASURY,
+            sanctionsOracle
         );
         console.log("ECFPRegistry:", address(registry));
         console.log("  submissionBond:", SUBMISSION_BOND / 1 ether, "ETC");
         console.log("  maxDraftsPerAddress:", MAX_DRAFTS_PER_ADDRESS);
+
+        // Step 6: Wire governor address into MemberNFT for vote-witness confirmation
+        OlympiaDAOMemberNFT(memberNFT).setGovernor(address(governor));
+        console.log("Governor wired into MemberNFT for vote-witness confirmation");
 
         vm.stopBroadcast();
 
@@ -97,6 +109,6 @@ contract DeployGovernance is Script {
         console.log("  2. Grant GOVERNOR_ROLE on ECFPRegistry to Timelock (for governance-gated transitions):");
         console.log("     cast send REGISTRY 'grantRole(bytes32,address)' <GOVERNOR_ROLE> <TIMELOCK>");
         console.log("  3. Optionally renounce deployer's PROPOSER/EXECUTOR/CANCELLER roles on Timelock");
-        console.log("  4. Optionally renounce deployer's DEFAULT_ADMIN_ROLE on Timelock (makes roles permanent)");
+        console.log("  4. Optionally renounce deployer's DEFAULT_ADMIN_ROLE on Timelock");
     }
 }

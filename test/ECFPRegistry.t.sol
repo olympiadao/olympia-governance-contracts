@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {ECFPRegistry} from "../src/ECFPRegistry.sol";
+import {SanctionsOracle} from "../src/SanctionsOracle.sol";
 
 contract ECFPRegistryTest is Test {
     ECFPRegistry public registry;
@@ -21,7 +22,7 @@ contract ECFPRegistryTest is Test {
     address public treasuryAddr = makeAddr("treasury");
 
     function setUp() public {
-        registry = new ECFPRegistry(admin, MIN_REVIEW, type(uint256).max, 0, treasuryAddr);
+        registry = new ECFPRegistry(admin, MIN_REVIEW, type(uint256).max, 0, treasuryAddr, address(0));
 
         // Grant GOVERNOR_ROLE to governor address
         vm.startPrank(admin);
@@ -219,7 +220,7 @@ contract ECFPRegistryTest is Test {
 
     function test_activateProposal_zeroReviewPeriod() public {
         vm.prank(admin);
-        ECFPRegistry zeroReview = new ECFPRegistry(admin, 0, type(uint256).max, 0, treasuryAddr);
+        ECFPRegistry zeroReview = new ECFPRegistry(admin, 0, type(uint256).max, 0, treasuryAddr, address(0));
 
         vm.startPrank(admin);
         zeroReview.grantRole(zeroReview.GOVERNOR_ROLE(), governor);
@@ -503,6 +504,163 @@ contract ECFPRegistryTest is Test {
         vm.stopPrank();
 
         assertTrue(registry.hasRole(registry.GOVERNOR_ROLE(), newGovernor));
+    }
+
+    // =========================================================================
+    // Sanctions gate
+    // =========================================================================
+
+    function test_activateProposal_revertsIfRecipientSanctioned() public {
+        SanctionsOracle oracle = new SanctionsOracle(admin);
+        ECFPRegistry registryWithOracle = new ECFPRegistry(
+            admin, MIN_REVIEW, type(uint256).max, 0, treasuryAddr, address(oracle)
+        );
+        vm.startPrank(admin);
+        registryWithOracle.grantRole(registryWithOracle.GOVERNOR_ROLE(), governor);
+        vm.stopPrank();
+
+        // Sanction the recipient
+        vm.prank(admin);
+        oracle.addAddress(recipient);
+
+        // Submit
+        vm.prank(alice);
+        bytes32 hashId = registryWithOracle.submit(ecfpId, recipient, amount, metadataCID);
+
+        vm.warp(block.timestamp + MIN_REVIEW + 1);
+
+        // activateProposal should revert
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(ECFPRegistry.SanctionedRecipient.selector, recipient));
+        registryWithOracle.activateProposal(hashId);
+    }
+
+    function test_activateProposal_succeedsIfOracleNotSet() public {
+        // Oracle = address(0) — sanctions gate disabled, should succeed
+        vm.prank(alice);
+        bytes32 hashId = registry.submit(ecfpId, recipient, amount, metadataCID);
+        vm.warp(block.timestamp + MIN_REVIEW + 1);
+        vm.prank(governor);
+        registry.activateProposal(hashId);
+
+        ECFPRegistry.Proposal memory p = registry.getProposal(hashId);
+        assertEq(uint8(p.status), uint8(ECFPRegistry.ProposalStatus.Active));
+    }
+
+    function test_cancelSanctioned_setsRejectedAndEmitsEvent() public {
+        SanctionsOracle oracle = new SanctionsOracle(admin);
+        ECFPRegistry registryWithOracle = new ECFPRegistry(
+            admin, 0, type(uint256).max, 0, treasuryAddr, address(oracle)
+        );
+        vm.startPrank(admin);
+        registryWithOracle.grantRole(registryWithOracle.GOVERNOR_ROLE(), governor);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        bytes32 hashId = registryWithOracle.submit(ecfpId, recipient, amount, metadataCID);
+
+        // Activate while recipient is clean
+        vm.prank(governor);
+        registryWithOracle.activateProposal(hashId);
+
+        // Now sanction the recipient
+        vm.prank(admin);
+        oracle.addAddress(recipient);
+
+        vm.expectEmit(true, true, false, false);
+        emit ECFPRegistry.ProposalCancelledDueToSanctions(hashId, recipient);
+        registryWithOracle.cancelSanctioned(hashId);
+
+        ECFPRegistry.Proposal memory p = registryWithOracle.getProposal(hashId);
+        assertEq(uint8(p.status), uint8(ECFPRegistry.ProposalStatus.Rejected));
+    }
+
+    function test_cancelSanctioned_revertsIfNotActive() public {
+        SanctionsOracle oracle = new SanctionsOracle(admin);
+        ECFPRegistry registryWithOracle = new ECFPRegistry(
+            admin, 0, type(uint256).max, 0, treasuryAddr, address(oracle)
+        );
+
+        vm.prank(alice);
+        bytes32 hashId = registryWithOracle.submit(ecfpId, recipient, amount, metadataCID);
+        // Still Draft — not Active
+
+        vm.prank(admin);
+        oracle.addAddress(recipient);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ECFPRegistry.InvalidStatusTransition.selector,
+                ECFPRegistry.ProposalStatus.Draft,
+                ECFPRegistry.ProposalStatus.Rejected
+            )
+        );
+        registryWithOracle.cancelSanctioned(hashId);
+    }
+
+    function test_cancelSanctioned_revertsIfNotSanctioned() public {
+        SanctionsOracle oracle = new SanctionsOracle(admin);
+        ECFPRegistry registryWithOracle = new ECFPRegistry(
+            admin, 0, type(uint256).max, 0, treasuryAddr, address(oracle)
+        );
+        vm.startPrank(admin);
+        registryWithOracle.grantRole(registryWithOracle.GOVERNOR_ROLE(), governor);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        bytes32 hashId = registryWithOracle.submit(ecfpId, recipient, amount, metadataCID);
+        vm.prank(governor);
+        registryWithOracle.activateProposal(hashId);
+
+        // Recipient is NOT sanctioned
+        vm.expectRevert(abi.encodeWithSelector(ECFPRegistry.RecipientNotSanctioned.selector, hashId));
+        registryWithOracle.cancelSanctioned(hashId);
+    }
+
+    function test_cancelSanctioned_permissionless() public {
+        SanctionsOracle oracle = new SanctionsOracle(admin);
+        ECFPRegistry registryWithOracle = new ECFPRegistry(
+            admin, 0, type(uint256).max, 0, treasuryAddr, address(oracle)
+        );
+        vm.startPrank(admin);
+        registryWithOracle.grantRole(registryWithOracle.GOVERNOR_ROLE(), governor);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        bytes32 hashId = registryWithOracle.submit(ecfpId, recipient, amount, metadataCID);
+        vm.prank(governor);
+        registryWithOracle.activateProposal(hashId);
+
+        vm.prank(admin);
+        oracle.addAddress(recipient);
+
+        // Anyone (non-admin) can call cancelSanctioned
+        address random = makeAddr("random");
+        vm.prank(random);
+        registryWithOracle.cancelSanctioned(hashId);
+
+        ECFPRegistry.Proposal memory p = registryWithOracle.getProposal(hashId);
+        assertEq(uint8(p.status), uint8(ECFPRegistry.ProposalStatus.Rejected));
+    }
+
+    function test_updateSanctionsOracle_onlyAdmin() public {
+        SanctionsOracle oracle = new SanctionsOracle(admin);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        registry.updateSanctionsOracle(address(oracle));
+
+        vm.prank(admin);
+        registry.updateSanctionsOracle(address(oracle));
+        assertEq(address(registry.sanctionsOracle()), address(oracle));
+    }
+
+    function test_updateSanctionsOracle_emitsEvent() public {
+        SanctionsOracle oracle = new SanctionsOracle(admin);
+        vm.prank(admin);
+        vm.expectEmit(true, true, false, false);
+        emit ECFPRegistry.SanctionsOracleUpdated(address(0), address(oracle));
+        registry.updateSanctionsOracle(address(oracle));
     }
 
     // =========================================================================

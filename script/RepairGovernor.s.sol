@@ -2,8 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {OlympiaGovernor} from "../src/OlympiaGovernor.sol";
-import {ISanctionsOracle} from "../src/interfaces/ISanctionsOracle.sol";
+import {OlympiaDAOGovernor} from "../src/OlympiaDAOGovernor.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
@@ -33,17 +32,16 @@ contract RepairGovernor is Script {
         vm.startBroadcast();
 
         // Step 1: Deploy Governor with CREATE2
-        OlympiaGovernor governor = new OlympiaGovernor{salt: SALT}(
-            "OlympiaGovernor",
+        OlympiaDAOGovernor governor = new OlympiaDAOGovernor{salt: SALT}(
+            "OlympiaDAO Governor v0.1",
             IVotes(MEMBER_NFT),
-            ISanctionsOracle(SANCTIONS_ORACLE),
             TIMELOCK,
             VOTING_DELAY,
             VOTING_PERIOD,
             QUORUM_PERCENT,
             LATE_QUORUM_EXTENSION
         );
-        console.log("OlympiaGovernor:", address(governor));
+        console.log("OlympiaDAOGovernor:", address(governor));
 
         // Step 2: Grant timelock roles to Governor
         // (Roles were previously granted to the same address but CREATE2 failed,
@@ -62,6 +60,6 @@ contract RepairGovernor is Script {
 
         console.log("");
         console.log("=== Governor Deployment Complete ===");
-        console.log("OlympiaGovernor:", address(governor));
+        console.log("OlympiaDAOGovernor:", address(governor));
     }
 }

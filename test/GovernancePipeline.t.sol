@@ -2,13 +2,13 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {OlympiaGovernor} from "../src/OlympiaGovernor.sol";
+import {OlympiaDAOGovernor} from "../src/OlympiaDAOGovernor.sol";
 import {OlympiaExecutor} from "../src/OlympiaExecutor.sol";
-import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
+import {OlympiaDAOMemberNFT} from "../src/OlympiaDAOMemberNFT.sol";
 import {SanctionsOracle} from "../src/SanctionsOracle.sol";
 import {ECFPRegistry} from "../src/ECFPRegistry.sol";
-import {ISanctionsOracle} from "../src/interfaces/ISanctionsOracle.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
+import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @dev Mock Treasury for end-to-end testing
@@ -28,8 +28,8 @@ contract MockTreasury {
 /// @title GovernancePipelineTest
 /// @notice End-to-end integration tests: ECFPRegistry + Governor + Executor + Treasury
 contract GovernancePipelineTest is Test {
-    OlympiaGovernor public governor;
-    OlympiaMemberNFT public nft;
+    OlympiaDAOGovernor public governor;
+    OlympiaDAOMemberNFT public nft;
     SanctionsOracle public oracle;
     TimelockController public timelock;
     OlympiaExecutor public executor;
@@ -51,7 +51,13 @@ contract GovernancePipelineTest is Test {
 
     function setUp() public {
         // Deploy infrastructure
-        nft = new OlympiaMemberNFT(admin);
+        nft = new OlympiaDAOMemberNFT(
+            "OlympiaDAO Member v0.4",
+            "OLYMPIADAOv04",
+            admin,
+            0,           // inactivityThreshold disabled
+            address(0)   // governor wired post-deploy
+        );
         oracle = new SanctionsOracle(admin);
         treasury = new MockTreasury();
         vm.deal(address(treasury), 100 ether);
@@ -61,11 +67,10 @@ contract GovernancePipelineTest is Test {
         address[] memory executors = new address[](0);
         timelock = new TimelockController(TIMELOCK_DELAY, proposers, executors, admin);
 
-        // Deploy governor
-        governor = new OlympiaGovernor(
-            "OlympiaGovernor",
-            nft,
-            ISanctionsOracle(address(oracle)),
+        // Deploy governor (pure OZ — no sanctionsOracle param)
+        governor = new OlympiaDAOGovernor(
+            "OlympiaDAO Governor v0.4",
+            IVotes(address(nft)),
             timelock,
             VOTING_DELAY,
             VOTING_PERIOD,
@@ -73,11 +78,11 @@ contract GovernancePipelineTest is Test {
             LATE_QUORUM_EXTENSION
         );
 
-        // Deploy executor
+        // Deploy executor (exit gate — checks sanctions before releasing funds)
         executor = new OlympiaExecutor(address(treasury), address(timelock), address(oracle));
 
-        // Deploy ECFPRegistry with admin (bond=0, cap=max for integration test simplicity)
-        registry = new ECFPRegistry(admin, 0, type(uint256).max, 0, address(treasury));
+        // Deploy ECFPRegistry (entry gate — checks sanctions at activateProposal)
+        registry = new ECFPRegistry(admin, 0, type(uint256).max, 0, address(treasury), address(oracle));
 
         // Configure roles
         vm.startPrank(admin);
@@ -177,50 +182,72 @@ contract GovernancePipelineTest is Test {
     }
 
     // =========================================================================
-    // Test 2: Layer 1 — sanctioned recipient blocked at propose()
+    // Test 2: ECFPRegistry entry gate — sanctioned recipient blocked at activateProposal()
     // =========================================================================
 
-    function test_pipeline_sanctionedRecipientBlockedAtLayer1() public {
-        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas) =
-            _getProposalActions(payable(sanctionedAddr), 1 ether);
+    function test_pipeline_sanctionedRecipientBlockedAtRegistryGate() public {
+        bytes32 ecfpId = keccak256("ECFP-SANCTIONED");
+        bytes32 metadataCID = keccak256("QmSanctionedProposal");
 
+        // Submit ECFP with sanctioned recipient — submit itself is permissionless
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(OlympiaGovernor.SanctionedRecipient.selector, sanctionedAddr));
-        governor.propose(targets, values, calldatas, "Send to sanctioned");
+        bytes32 hashId = registry.submit(ecfpId, payable(sanctionedAddr), 1 ether, metadataCID);
+
+        // activateProposal should revert because recipient is sanctioned
+        vm.expectRevert(abi.encodeWithSelector(ECFPRegistry.SanctionedRecipient.selector, sanctionedAddr));
+        vm.prank(admin);
+        registry.activateProposal(hashId);
     }
 
     // =========================================================================
-    // Test 3: Layer 2 — cancelIfSanctioned mid-vote
+    // Test 3: ECFPRegistry cancelSanctioned — recipient sanctioned after activation
     // =========================================================================
 
-    function test_pipeline_sanctionedRecipientCancelledAtLayer2() public {
-        uint256 amount = 2 ether;
+    function test_pipeline_cancelSanctionedAfterActivation() public {
+        bytes32 ecfpId = keccak256("ECFP-LATEWARN");
+        bytes32 metadataCID = keccak256("QmLateWarnProposal");
 
-        // Propose to a clean recipient
-        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas) =
-            _getProposalActions(recipient, amount);
-
+        // Submit with a clean recipient
         vm.prank(alice);
-        uint256 proposalId = governor.propose(targets, values, calldatas, "Withdraw 2 ETH");
+        bytes32 hashId = registry.submit(ecfpId, recipient, 2 ether, metadataCID);
 
-        // Start voting
-        _advancePastVotingDelay();
-        vm.prank(alice);
-        governor.castVote(proposalId, 1);
+        // Activate — recipient not yet sanctioned
+        vm.prank(admin);
+        registry.activateProposal(hashId);
 
-        // Recipient becomes sanctioned mid-vote
+        ECFPRegistry.Proposal memory p = registry.getProposal(hashId);
+        assertEq(uint8(p.status), uint8(ECFPRegistry.ProposalStatus.Active));
+
+        // Recipient becomes sanctioned after activation
         vm.prank(admin);
         oracle.addAddress(recipient);
 
-        // Anyone can cancel
-        governor.cancelIfSanctioned(proposalId);
+        // Anyone can call cancelSanctioned
+        vm.expectEmit(true, true, false, false);
+        emit ECFPRegistry.ProposalCancelledDueToSanctions(hashId, recipient);
+        registry.cancelSanctioned(hashId);
 
-        // Verify cancelled
-        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.Canceled));
+        // Verify ECFPRegistry status is Rejected
+        p = registry.getProposal(hashId);
+        assertEq(uint8(p.status), uint8(ECFPRegistry.ProposalStatus.Rejected));
+    }
+
+    function test_pipeline_cancelSanctioned_revertsWhenNotSanctioned() public {
+        bytes32 ecfpId = keccak256("ECFP-CLEAN");
+        bytes32 metadataCID = keccak256("QmCleanProposal");
+
+        vm.prank(alice);
+        bytes32 hashId = registry.submit(ecfpId, recipient, 1 ether, metadataCID);
+        vm.prank(admin);
+        registry.activateProposal(hashId);
+
+        // Recipient is NOT sanctioned — should revert
+        vm.expectRevert(abi.encodeWithSelector(ECFPRegistry.RecipientNotSanctioned.selector, hashId));
+        registry.cancelSanctioned(hashId);
     }
 
     // =========================================================================
-    // Test 4: Layer 3 — oracle updated after vote, executor blocks at execution
+    // Test 4: Layer 3 — executor blocks sanctioned recipient at execution
     // =========================================================================
 
     function test_pipeline_sanctionedRecipientBlockedAtLayer3() public {
@@ -254,40 +281,39 @@ contract GovernancePipelineTest is Test {
     }
 
     // =========================================================================
-    // Test 5: Governor updates its own sanctions oracle via governance
+    // Test 5: ECFPRegistry updateSanctionsOracle via governance
     // =========================================================================
 
-    function test_pipeline_governorUpdatesOwnSanctionsOracle() public {
-        // Deploy a new oracle
+    function test_pipeline_ecfpRegistryUpdatesSanctionsOracle() public {
         SanctionsOracle newOracle = new SanctionsOracle(admin);
 
-        // Create governance proposal to update the oracle
+        // Governance proposal to update the oracle on the ECFPRegistry
         address[] memory targets = new address[](1);
-        targets[0] = address(governor);
-
+        targets[0] = address(registry);
         uint256[] memory values = new uint256[](1);
-        values[0] = 0;
-
         bytes[] memory calldatas = new bytes[](1);
-        calldatas[0] = abi.encodeCall(OlympiaGovernor.updateSanctionsOracle, (ISanctionsOracle(address(newOracle))));
+        calldatas[0] = abi.encodeCall(ECFPRegistry.updateSanctionsOracle, (address(newOracle)));
 
         vm.prank(alice);
-        uint256 proposalId = governor.propose(targets, values, calldatas, "Update sanctions oracle");
+        uint256 proposalId = governor.propose(targets, values, calldatas, "Update ECFPRegistry oracle");
 
         _advancePastVotingDelay();
-
         vm.prank(alice);
         governor.castVote(proposalId, 1);
         vm.prank(bob);
         governor.castVote(proposalId, 1);
 
         _advancePastVotingPeriod();
-        governor.queue(targets, values, calldatas, keccak256(bytes("Update sanctions oracle")));
-
+        governor.queue(targets, values, calldatas, keccak256(bytes("Update ECFPRegistry oracle")));
         _advancePastTimelockDelay();
-        governor.execute(targets, values, calldatas, keccak256(bytes("Update sanctions oracle")));
 
-        // Verify oracle was updated
-        assertEq(address(governor.sanctionsOracle()), address(newOracle));
+        // Grant DEFAULT_ADMIN_ROLE to the timelock so it can call updateSanctionsOracle
+        vm.startPrank(admin);
+        registry.grantRole(registry.DEFAULT_ADMIN_ROLE(), address(timelock));
+        vm.stopPrank();
+
+        governor.execute(targets, values, calldatas, keccak256(bytes("Update ECFPRegistry oracle")));
+
+        assertEq(address(registry.sanctionsOracle()), address(newOracle));
     }
 }

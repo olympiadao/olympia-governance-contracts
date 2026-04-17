@@ -3,21 +3,34 @@ pragma solidity ^0.8.28;
 
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
-import {IOlympiaMemberRenderer} from "./IOlympiaMemberRenderer.sol";
+import {IOlympiaDAOMemberRenderer} from "./IOlympiaDAOMemberRenderer.sol";
 import {OlympiaSVG} from "./OlympiaSVG.sol";
 
-/// @title OlympiaMemberRenderer
-/// @notice Generates fully on-chain metadata and SVG art for Olympia membership NFTs.
+/// @title OlympiaDAOMemberRenderer
+/// @notice Generates fully on-chain metadata and SVG art for OlympiaDAO membership NFTs.
 ///         Deterministic visual traits derived from tokenId hash.
-contract OlympiaMemberRenderer is IOlympiaMemberRenderer {
+///         The NFT display name is set at deploy time by the deploy script so it tracks versioning.
+contract OlympiaDAOMemberRenderer is IOlympiaDAOMemberRenderer {
     using Strings for uint256;
 
-    /// @inheritdoc IOlympiaMemberRenderer
-    function tokenURI(uint256 tokenId, address owner, uint256 mintBlock) external view returns (string memory) {
+    /// @notice Display name used in NFT metadata (e.g. "OlympiaDAO Member v0.4")
+    string public nftDisplayName;
+
+    /// @param nftDisplayName_ Display name for NFT metadata (passed from deploy script)
+    constructor(string memory nftDisplayName_) {
+        nftDisplayName = nftDisplayName_;
+    }
+
+    /// @inheritdoc IOlympiaDAOMemberRenderer
+    function tokenURI(uint256 tokenId, address owner, uint256 mintBlock, uint256 lastActivityBlock)
+        external
+        view
+        returns (string memory)
+    {
         OlympiaSVG.SVGParams memory params = _deriveParams(tokenId, owner, mintBlock);
         string memory svg = OlympiaSVG.generateSVG(params);
         string memory svgBase64 = Base64.encode(bytes(svg));
-        string memory json = _buildJSON(tokenId, mintBlock, params.chain, svgBase64);
+        string memory json = _buildJSON(tokenId, mintBlock, lastActivityBlock, params.chain, svgBase64);
         return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
     }
 
@@ -80,20 +93,21 @@ contract OlympiaMemberRenderer is IOlympiaMemberRenderer {
     function _buildJSON(
         uint256 tokenId,
         uint256 mintBlock,
+        uint256 lastActivityBlock,
         string memory chain,
         string memory svgBase64
-    ) private pure returns (string memory) {
+    ) private view returns (string memory) {
         return string(abi.encodePacked(
-            '{"name":"Olympia v0.3 Contributor #', tokenId.toString(),
-            '","description":"Verified Ethereum Classic Core Contributor. Soulbound governance NFT for Olympia (ECIP-1113). One NFT = one vote."',
+            '{"name":"', nftDisplayName, ' Contributor #', tokenId.toString(),
+            '","description":"Verified Ethereum Classic Core Contributor. Soulbound governance NFT for OlympiaDAO (ECIP-1113). One NFT = one vote."',
             ',"image":"data:image/svg+xml;base64,', svgBase64,
             '","animation_url":"data:image/svg+xml;base64,', svgBase64,
-            '","attributes":', _buildAttributes(tokenId, mintBlock, chain),
+            '","attributes":', _buildAttributes(tokenId, mintBlock, lastActivityBlock, chain),
             '}'
         ));
     }
 
-    function _buildAttributes(uint256 tokenId, uint256 mintBlock, string memory chain)
+    function _buildAttributes(uint256 tokenId, uint256 mintBlock, uint256 lastActivityBlock, string memory chain)
         private
         pure
         returns (string memory)
@@ -102,7 +116,8 @@ contract OlympiaMemberRenderer is IOlympiaMemberRenderer {
             '[{"trait_type":"Contributor Number","display_type":"number","value":', tokenId.toString(),
             '},{"trait_type":"Chain","value":"', chain,
             '"},{"trait_type":"Mint Block","display_type":"number","value":', mintBlock.toString(),
-            '},{"trait_type":"Status","value":"Active"}]'
+            '},{"trait_type":"Last Active Block","display_type":"number","value":', lastActivityBlock.toString(),
+            '}]'
         ));
     }
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {OlympiaGovernor} from "../../src/OlympiaGovernor.sol";
+import {OlympiaDAOGovernor} from "../../src/OlympiaDAOGovernor.sol";
 import {OlympiaExecutor} from "../../src/OlympiaExecutor.sol";
-import {OlympiaMemberNFT} from "../../src/OlympiaMemberNFT.sol";
+import {OlympiaDAOMemberNFT} from "../../src/OlympiaDAOMemberNFT.sol";
 import {ECFPRegistry} from "../../src/ECFPRegistry.sol";
 import {MembershipVerifier} from "../../src/nft/MembershipVerifier.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
@@ -20,8 +20,8 @@ abstract contract SeedConfig {
     // Update these constants after deployment.
     // =========================================================================
 
-    OlympiaGovernor internal constant GOVERNOR =
-        OlympiaGovernor(payable(0xe763f13cC89292C4F279BEF2aD54F1E89A3a87d3));
+    OlympiaDAOGovernor internal constant GOVERNOR =
+        OlympiaDAOGovernor(payable(0xe763f13cC89292C4F279BEF2aD54F1E89A3a87d3));
 
     TimelockController internal constant TIMELOCK =
         TimelockController(payable(0x3d19fEfB093Abad60421B89CF48f4569aaae39b6));
@@ -29,8 +29,8 @@ abstract contract SeedConfig {
     OlympiaExecutor internal constant EXECUTOR =
         OlympiaExecutor(payable(0x292eBe07d11850Dfc94Cbf9c72C3A054d23cAB54));
 
-    OlympiaMemberNFT internal constant MEMBER_NFT =
-        OlympiaMemberNFT(0xb4D45A498994C89553A9c923c6b85F7623C0843e);
+    OlympiaDAOMemberNFT internal constant MEMBER_NFT =
+        OlympiaDAOMemberNFT(0xb4D45A498994C89553A9c923c6b85F7623C0843e);
 
     MembershipVerifier internal constant VERIFIER =
         MembershipVerifier(0xb6274251Fb8F1D865A0B62bba9fF31c1bfEdccE6);

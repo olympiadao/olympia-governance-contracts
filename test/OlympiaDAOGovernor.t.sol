@@ -2,12 +2,12 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {OlympiaGovernor} from "../src/OlympiaGovernor.sol";
+import {OlympiaDAOGovernor} from "../src/OlympiaDAOGovernor.sol";
 import {OlympiaExecutor} from "../src/OlympiaExecutor.sol";
-import {OlympiaMemberNFT} from "../src/OlympiaMemberNFT.sol";
+import {OlympiaDAOMemberNFT} from "../src/OlympiaDAOMemberNFT.sol";
 import {SanctionsOracle} from "../src/SanctionsOracle.sol";
-import {ISanctionsOracle} from "../src/interfaces/ISanctionsOracle.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
+import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @dev Mock Treasury for integration testing
@@ -24,9 +24,9 @@ contract MockTreasury {
     receive() external payable {}
 }
 
-contract OlympiaGovernorTest is Test {
-    OlympiaGovernor public governor;
-    OlympiaMemberNFT public nft;
+contract OlympiaDAOGovernorTest is Test {
+    OlympiaDAOGovernor public governor;
+    OlympiaDAOMemberNFT public nft;
     SanctionsOracle public oracle;
     TimelockController public timelock;
     OlympiaExecutor public executor;
@@ -37,7 +37,6 @@ contract OlympiaGovernorTest is Test {
     address public bob = makeAddr("bob");
     address public charlie = makeAddr("charlie");
     address payable public recipient = payable(makeAddr("recipient"));
-    address public sanctionedAddr = makeAddr("sanctioned");
 
     uint48 constant VOTING_DELAY = 1;
     uint32 constant VOTING_PERIOD = 100;
@@ -46,22 +45,25 @@ contract OlympiaGovernorTest is Test {
     uint256 constant TIMELOCK_DELAY = 3600;
 
     function setUp() public {
-        // Deploy infrastructure
-        nft = new OlympiaMemberNFT(admin);
+        nft = new OlympiaDAOMemberNFT(
+            "OlympiaDAO Member v0.4",
+            "OLYMPIADAOv04",
+            admin,
+            0,           // inactivityThreshold disabled
+            address(0)   // governor wired post-deploy
+        );
         oracle = new SanctionsOracle(admin);
         treasury = new MockTreasury();
         vm.deal(address(treasury), 100 ether);
 
-        // Deploy timelock — governor address not yet known, we'll set roles after
         address[] memory proposers = new address[](0);
         address[] memory executors = new address[](0);
         timelock = new TimelockController(TIMELOCK_DELAY, proposers, executors, admin);
 
-        // Deploy governor
-        governor = new OlympiaGovernor(
-            "OlympiaGovernor",
-            nft,
-            ISanctionsOracle(address(oracle)),
+        // OlympiaDAOGovernor — no sanctionsOracle constructor param
+        governor = new OlympiaDAOGovernor(
+            "OlympiaDAO Governor v0.4",
+            IVotes(address(nft)),
             timelock,
             VOTING_DELAY,
             VOTING_PERIOD,
@@ -69,22 +71,16 @@ contract OlympiaGovernorTest is Test {
             LATE_QUORUM_EXTENSION
         );
 
-        // Deploy executor
         executor = new OlympiaExecutor(address(treasury), address(timelock), address(oracle));
 
-        // Configure timelock roles
         vm.startPrank(admin);
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(governor));
         timelock.grantRole(timelock.CANCELLER_ROLE(), address(governor));
 
-        // Mint NFTs to voters
-        nft.safeMint(alice); // tokenId 0
-        nft.safeMint(bob); // tokenId 1
+        nft.safeMint(alice);   // tokenId 0
+        nft.safeMint(bob);     // tokenId 1
         nft.safeMint(charlie); // tokenId 2
-
-        // Sanction an address
-        oracle.addAddress(sanctionedAddr);
         vm.stopPrank();
     }
 
@@ -98,10 +94,7 @@ contract OlympiaGovernorTest is Test {
     {
         address[] memory targets = new address[](1);
         targets[0] = address(executor);
-
         uint256[] memory values = new uint256[](1);
-        values[0] = 0;
-
         bytes[] memory calldatas = new bytes[](1);
         calldatas[0] = abi.encodeCall(OlympiaExecutor.executeTreasury, (to, amount));
 
@@ -117,7 +110,6 @@ contract OlympiaGovernorTest is Test {
         targets = new address[](1);
         targets[0] = address(executor);
         values = new uint256[](1);
-        values[0] = 0;
         calldatas = new bytes[](1);
         calldatas[0] = abi.encodeCall(OlympiaExecutor.executeTreasury, (to, amount));
     }
@@ -142,10 +134,6 @@ contract OlympiaGovernorTest is Test {
         assertEq(address(governor.token()), address(nft));
     }
 
-    function test_constructor_setsSanctionsOracle() public view {
-        assertEq(address(governor.sanctionsOracle()), address(oracle));
-    }
-
     function test_constructor_setsTimelock() public view {
         assertEq(governor.timelock(), address(timelock));
     }
@@ -157,7 +145,7 @@ contract OlympiaGovernorTest is Test {
     }
 
     // =========================================================================
-    // Propose (Layer 1)
+    // Propose
     // =========================================================================
 
     function test_propose_happyPath() public {
@@ -166,28 +154,23 @@ contract OlympiaGovernorTest is Test {
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Pending));
     }
 
-    function test_propose_revertsIfCalldataRecipientSanctioned() public {
+    function test_propose_sanctionedRecipient_succeeds() public {
+        // OlympiaDAOGovernor has no sanctions check — sanctioned recipients pass through propose().
+        // The sanctions gate is at ECFPRegistry.activateProposal() and OlympiaExecutor.executeTreasury().
+        address sanctionedAddr = makeAddr("sanctioned");
+        vm.prank(admin);
+        oracle.addAddress(sanctionedAddr);
+
         address[] memory targets = new address[](1);
         targets[0] = address(executor);
         uint256[] memory values = new uint256[](1);
         bytes[] memory calldatas = new bytes[](1);
         calldatas[0] = abi.encodeCall(OlympiaExecutor.executeTreasury, (payable(sanctionedAddr), 1 ether));
 
+        // Should succeed — no sanctions gate in the Governor
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(OlympiaGovernor.SanctionedRecipient.selector, sanctionedAddr));
-        governor.propose(targets, values, calldatas, "Fund sanctioned");
-    }
-
-    function test_propose_revertsIfTargetSanctioned() public {
-        address[] memory targets = new address[](1);
-        targets[0] = sanctionedAddr;
-        uint256[] memory values = new uint256[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        calldatas[0] = "";
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(OlympiaGovernor.SanctionedRecipient.selector, sanctionedAddr));
-        governor.propose(targets, values, calldatas, "Target sanctioned");
+        uint256 proposalId = governor.propose(targets, values, calldatas, "Fund sanctioned");
+        assertTrue(proposalId != 0);
     }
 
     // =========================================================================
@@ -200,10 +183,8 @@ contract OlympiaGovernorTest is Test {
 
         vm.prank(alice);
         governor.castVote(proposalId, 1); // For
-
         vm.prank(bob);
         governor.castVote(proposalId, 0); // Against
-
         vm.prank(charlie);
         governor.castVote(proposalId, 2); // Abstain
 
@@ -219,12 +200,10 @@ contract OlympiaGovernorTest is Test {
 
         address noNFT = makeAddr("noNFT");
         vm.prank(noNFT);
-        governor.castVote(proposalId, 1); // Succeeds but with 0 weight
+        governor.castVote(proposalId, 1);
 
-        (uint256 againstVotes, uint256 forVotes, uint256 abstainVotes) = governor.proposalVotes(proposalId);
+        (, uint256 forVotes,) = governor.proposalVotes(proposalId);
         assertEq(forVotes, 0);
-        assertEq(againstVotes, 0);
-        assertEq(abstainVotes, 0);
     }
 
     function test_castVote_weightEqualsOnePerMember() public {
@@ -235,7 +214,7 @@ contract OlympiaGovernorTest is Test {
         governor.castVote(proposalId, 1);
 
         (, uint256 forVotes,) = governor.proposalVotes(proposalId);
-        assertEq(forVotes, 1); // 1 NFT = 1 vote (one-address-one-vote)
+        assertEq(forVotes, 1);
     }
 
     // =========================================================================
@@ -246,7 +225,6 @@ contract OlympiaGovernorTest is Test {
         uint256 proposalId = _proposeWithdrawal(recipient, 1 ether, "Queue test");
         _advancePastVotingDelay();
 
-        // All 3 vote For (quorum = 10% of 3 = 1 needed)
         vm.prank(alice);
         governor.castVote(proposalId, 1);
         vm.prank(bob);
@@ -254,7 +232,6 @@ contract OlympiaGovernorTest is Test {
 
         _advancePastVotingPeriod();
 
-        // Queue
         (address[] memory targets, uint256[] memory values, bytes[] memory calldatas) =
             _getProposalActions(recipient, 1 ether);
         governor.queue(targets, values, calldatas, keccak256(bytes("Queue test")));
@@ -291,11 +268,9 @@ contract OlympiaGovernorTest is Test {
     // =========================================================================
 
     function test_fullLifecycle_proposeVoteQueueExecuteWithdraw() public {
-        // 1. Propose
         uint256 amount = 5 ether;
         uint256 proposalId = _proposeWithdrawal(recipient, amount, "Full lifecycle");
 
-        // 2. Vote
         _advancePastVotingDelay();
         vm.prank(alice);
         governor.castVote(proposalId, 1);
@@ -307,118 +282,15 @@ contract OlympiaGovernorTest is Test {
         _advancePastVotingPeriod();
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Succeeded));
 
-        // 3. Queue
         (address[] memory targets, uint256[] memory values, bytes[] memory calldatas) =
             _getProposalActions(recipient, amount);
         governor.queue(targets, values, calldatas, keccak256(bytes("Full lifecycle")));
 
-        // 4. Execute after timelock
         _advancePastTimelockDelay();
         uint256 balBefore = recipient.balance;
         governor.execute(targets, values, calldatas, keccak256(bytes("Full lifecycle")));
 
-        // 5. Verify
         assertEq(recipient.balance, balBefore + amount);
-    }
-
-    // =========================================================================
-    // cancelIfSanctioned (Layer 2)
-    // =========================================================================
-
-    function test_cancelIfSanctioned_cancelsWhenRecipientSanctioned() public {
-        uint256 proposalId = _proposeWithdrawal(recipient, 1 ether, "Cancel test");
-        _advancePastVotingDelay();
-
-        // Recipient becomes sanctioned mid-voting
-        vm.prank(admin);
-        oracle.addAddress(address(recipient));
-
-        // Anyone can cancel
-        governor.cancelIfSanctioned(proposalId);
-        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Canceled));
-    }
-
-    function test_cancelIfSanctioned_revertsWhenNoSanctionedRecipients() public {
-        uint256 proposalId = _proposeWithdrawal(recipient, 1 ether, "No sanction");
-        _advancePastVotingDelay();
-
-        vm.expectRevert(abi.encodeWithSelector(OlympiaGovernor.NoSanctionedRecipients.selector, proposalId));
-        governor.cancelIfSanctioned(proposalId);
-    }
-
-    function test_cancelIfSanctioned_worksOnQueuedProposal() public {
-        uint256 proposalId = _proposeWithdrawal(recipient, 1 ether, "Queued cancel");
-        _advancePastVotingDelay();
-
-        vm.prank(alice);
-        governor.castVote(proposalId, 1);
-        vm.prank(bob);
-        governor.castVote(proposalId, 1);
-
-        _advancePastVotingPeriod();
-
-        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas) =
-            _getProposalActions(recipient, 1 ether);
-        governor.queue(targets, values, calldatas, keccak256(bytes("Queued cancel")));
-
-        // Sanction recipient after queuing
-        vm.prank(admin);
-        oracle.addAddress(address(recipient));
-
-        governor.cancelIfSanctioned(proposalId);
-        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Canceled));
-    }
-
-    function test_cancelIfSanctioned_emitsEvent() public {
-        uint256 proposalId = _proposeWithdrawal(recipient, 1 ether, "Event test");
-        _advancePastVotingDelay();
-
-        vm.prank(admin);
-        oracle.addAddress(address(recipient));
-
-        vm.expectEmit(true, true, false, false);
-        emit OlympiaGovernor.ProposalCancelledDueToSanctions(proposalId, address(recipient));
-        governor.cancelIfSanctioned(proposalId);
-    }
-
-    // =========================================================================
-    // updateSanctionsOracle
-    // =========================================================================
-
-    function test_updateSanctionsOracle_onlyViaGovernance() public {
-        SanctionsOracle newOracle = new SanctionsOracle(admin);
-
-        vm.prank(alice);
-        vm.expectRevert();
-        governor.updateSanctionsOracle(ISanctionsOracle(address(newOracle)));
-    }
-
-    function test_updateSanctionsOracle_updatesOracle() public {
-        SanctionsOracle newOracle = new SanctionsOracle(admin);
-
-        // Must go through full governance pipeline (onlyGovernance modifier)
-        address[] memory targets = new address[](1);
-        targets[0] = address(governor);
-        uint256[] memory values = new uint256[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        calldatas[0] = abi.encodeCall(OlympiaGovernor.updateSanctionsOracle, (ISanctionsOracle(address(newOracle))));
-        string memory desc = "Update sanctions oracle";
-
-        vm.prank(alice);
-        uint256 proposalId = governor.propose(targets, values, calldatas, desc);
-
-        _advancePastVotingDelay();
-        vm.prank(alice);
-        governor.castVote(proposalId, 1);
-        vm.prank(bob);
-        governor.castVote(proposalId, 1);
-
-        _advancePastVotingPeriod();
-        governor.queue(targets, values, calldatas, keccak256(bytes(desc)));
-        _advancePastTimelockDelay();
-        governor.execute(targets, values, calldatas, keccak256(bytes(desc)));
-
-        assertEq(address(governor.sanctionsOracle()), address(newOracle));
     }
 
     // =========================================================================
@@ -426,35 +298,26 @@ contract OlympiaGovernorTest is Test {
     // =========================================================================
 
     function test_quorum_correctFractionOfNFTSupply() public view {
-        // 3 NFTs minted, 10% quorum = ceil(0.3) = 0 (floor, since OZ uses floor)
-        // Actually OZ: quorum = totalSupply * numerator / denominator
-        // 3 * 10 / 100 = 0 (integer division)
-        // But with 10 NFTs: 10 * 10 / 100 = 1
+        // 3 NFTs, 10% quorum = floor(3 × 10 / 100) = 0
         uint256 q = governor.quorum(block.number - 1);
-        // 3 NFTs * 10% = 0 (floor division)
         assertEq(q, 0);
     }
 
     function test_quorum_proposalFailsWithoutQuorum() public {
-        // Mint more NFTs so quorum > 0
         vm.startPrank(admin);
         for (uint256 i = 0; i < 10; i++) {
             nft.safeMint(makeAddr(string(abi.encodePacked("voter", i))));
         }
         vm.stopPrank();
 
-        // Now 13 NFTs, quorum = 13 * 10 / 100 = 1
         uint256 proposalId = _proposeWithdrawal(recipient, 1 ether, "Quorum fail");
         _advancePastVotingDelay();
 
-        // Only one abstain vote (abstain doesn't count toward quorum in Bravo)
         vm.prank(alice);
         governor.castVote(proposalId, 2); // Abstain
 
         _advancePastVotingPeriod();
 
-        // Bravo quorum counts For + Abstain, so 1 abstain satisfies quorum=1
-        // But we need to check if the vote passes: no For votes means it's Defeated
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Defeated));
     }
 }

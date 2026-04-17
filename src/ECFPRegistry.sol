@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {ISanctionsOracle} from "./interfaces/ISanctionsOracle.sol";
 
 /// @title ECFPRegistry
 /// @notice Hash-bound funding proposal registry with GOVERNOR_ROLE-gated status transitions (ECIP-1114)
@@ -15,6 +16,9 @@ contract ECFPRegistry is AccessControl, ReentrancyGuard {
     using Address for address payable;
 
     bytes32 public constant GOVERNOR_ROLE = keccak256("GOVERNOR_ROLE");
+
+    /// @notice Sanctions oracle for recipient screening. May be address(0) (sanctions gate disabled).
+    ISanctionsOracle public sanctionsOracle;
 
     enum ProposalStatus {
         Draft,
@@ -73,6 +77,8 @@ contract ECFPRegistry is AccessControl, ReentrancyGuard {
     event SubmissionBondUpdated(uint256 oldBond, uint256 newBond);
     event RefundPending(address indexed proposer, uint256 amount);
     event RefundClaimed(address indexed proposer, uint256 amount);
+    event SanctionsOracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event ProposalCancelledDueToSanctions(bytes32 indexed hashId, address indexed sanctionedRecipient);
 
     error DuplicateProposal(bytes32 hashId);
     error ProposalNotFound(bytes32 hashId);
@@ -88,13 +94,16 @@ contract ECFPRegistry is AccessControl, ReentrancyGuard {
     error NoRefundPending();
     error ZeroTreasury();
     error ZeroMaxDrafts();
+    error SanctionedRecipient(address recipient);
+    error RecipientNotSanctioned(bytes32 hashId);
 
     constructor(
         address admin,
         uint256 _minReviewPeriod,
         uint256 _maxDraftsPerAddress,
         uint256 _initialSubmissionBond,
-        address treasuryAddress
+        address treasuryAddress,
+        address sanctionsOracle_
     ) {
         if (treasuryAddress == address(0)) revert ZeroTreasury();
         if (_maxDraftsPerAddress == 0) revert ZeroMaxDrafts();
@@ -104,6 +113,7 @@ contract ECFPRegistry is AccessControl, ReentrancyGuard {
         maxDraftsPerAddress = _maxDraftsPerAddress;
         submissionBond = _initialSubmissionBond;
         _treasury = treasuryAddress;
+        sanctionsOracle = ISanctionsOracle(sanctionsOracle_); // may be address(0)
     }
 
     /// @notice Submit a new funding proposal (permissionless — any ETC address).
@@ -215,6 +225,7 @@ contract ECFPRegistry is AccessControl, ReentrancyGuard {
 
     /// @notice Activate a Draft proposal (Draft → Active). Enforces minimum review period.
     ///         Bond is queued for refund via pendingRefunds — proposer calls claimRefund() to receive it.
+    ///         Sanctions gate: reverts if the sanctions oracle flags the recipient.
     function activateProposal(bytes32 hashId) external onlyRole(GOVERNOR_ROLE) {
         _requireExists(hashId);
         Proposal storage p = _proposals[hashId];
@@ -222,6 +233,10 @@ contract ECFPRegistry is AccessControl, ReentrancyGuard {
             revert InvalidStatusTransition(p.status, ProposalStatus.Active);
         }
         if (block.timestamp < p.timestamp + minReviewPeriod) revert ReviewPeriodActive();
+        // Sanctions gate: block sanctioned recipients before entering the OZ Governor workflow
+        if (address(sanctionsOracle) != address(0) && sanctionsOracle.isSanctioned(p.recipient)) {
+            revert SanctionedRecipient(p.recipient);
+        }
 
         p.status = ProposalStatus.Active;
 
@@ -338,6 +353,33 @@ contract ECFPRegistry is AccessControl, ReentrancyGuard {
         uint256 old = submissionBond;
         submissionBond = newBond;
         emit SubmissionBondUpdated(old, newBond);
+    }
+
+    /// @notice Cancel an Active proposal whose recipient has become sanctioned after activation.
+    ///         Permissionless — anyone can call when the oracle flags the recipient.
+    ///         Sets status to Rejected (no further ECFPRegistry transitions possible).
+    ///         Note: the corresponding Governor proposal remains live; the OlympiaExecutor exit gate
+    ///         blocks execution regardless. This is intentional — ECFPRegistry is not the Governor proposer.
+    function cancelSanctioned(bytes32 hashId) external {
+        _requireExists(hashId);
+        Proposal storage p = _proposals[hashId];
+        if (p.status != ProposalStatus.Active) {
+            revert InvalidStatusTransition(p.status, ProposalStatus.Rejected);
+        }
+        if (address(sanctionsOracle) == address(0) || !sanctionsOracle.isSanctioned(p.recipient)) {
+            revert RecipientNotSanctioned(hashId);
+        }
+        p.status = ProposalStatus.Rejected;
+        // Bond was already returned to pendingRefunds at activateProposal() — nothing to refund here.
+        // Proposer is not penalised: the recipient became sanctioned after they submitted in good faith.
+        emit ProposalCancelledDueToSanctions(hashId, p.recipient);
+    }
+
+    /// @notice Update the sanctions oracle (DEFAULT_ADMIN_ROLE; use OIP after governance is live).
+    function updateSanctionsOracle(address newOracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address old = address(sanctionsOracle);
+        sanctionsOracle = ISanctionsOracle(newOracle); // may be address(0) to disable
+        emit SanctionsOracleUpdated(old, newOracle);
     }
 
     /// @notice Compute the hash-bound identifier for a proposal
